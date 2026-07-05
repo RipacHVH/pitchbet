@@ -32,6 +32,10 @@ Schema is created automatically on first request (`ensureSchema()` in `src/lib/d
 - **The Locker Room** (`/shop`): everything costs coins, nothing costs money. Customize your manager (skin tone, hair, free kits) and grind for cosmetics — kits (500–2,500), headwear up to The Crown (5,000), extras like the Captain's Armband, plus **1 free month of Pro for 10,000 coins** (redeemable when subscriptions launch). Your avatar shows on every arena table and the world rankings.
 - **Accounts**: register with a manager name + password (scrypt-hashed). Log in from any device; pre-accounts players claim their name by setting a password on first login.
 
+## Deploy status
+
+Auto-deploy is enabled on Render (`On Commit`) — pushes to `main` should deploy automatically.
+
 ## Deploying multiplayer on Render
 
 `render.yaml` is a ready Blueprint: one **free-tier** web service (no persistent disk needed — Postgres is external on Supabase). Steps: push this folder to a GitHub repo → Render Dashboard → New → Blueprint → pick the repo → paste `DATABASE_URL` (Supabase pooler URI) and `ODDS_API_KEY` when prompted. Everyone who opens the URL shares the same arenas, shop and rankings.

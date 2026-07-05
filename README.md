@@ -34,7 +34,7 @@ Schema is created automatically on first request (`ensureSchema()` in `src/lib/d
 
 ## Deploy status
 
-Auto-deploy is enabled on Render (`On Commit`) — pushes to `main` should deploy automatically.
+Auto-deploy is enabled on Render (`On Commit`) and confirmed working — pushes to `main` deploy automatically.
 
 ## Deploying multiplayer on Render
 

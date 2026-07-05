@@ -48,25 +48,41 @@ export interface AuthResult {
   error?: string;
 }
 
-export async function registerPlayer(rawName: string, password: string): Promise<AuthResult> {
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export async function registerPlayer(
+  rawName: string,
+  email: string,
+  password: string,
+): Promise<AuthResult> {
   await ensureSchema();
   const username = rawName.trim().replace(/\s+/g, " ");
   if (!/^[A-Za-z0-9 _.-]{3,16}$/.test(username)) {
     return { error: "Name must be 3–16 characters: letters, numbers, spaces." };
   }
+  const normalizedEmail = (email ?? "").trim().toLowerCase();
+  if (!EMAIL_RE.test(normalizedEmail)) {
+    return { error: "Enter a valid email address." };
+  }
   if (typeof password !== "string" || password.length < 6) {
     return { error: "Password needs at least 6 characters." };
   }
 
-  const existing = await db().one<{ id: number }>(
+  const existingName = await db().one<{ id: number }>(
     "SELECT id FROM players WHERE lower(username) = lower(?)",
     [username],
   );
-  if (existing) return { error: "That name is already managing a club. Pick another or log in." };
+  if (existingName) return { error: "That name is already managing a club. Pick another or log in." };
+
+  const existingEmail = await db().one<{ id: number }>(
+    "SELECT id FROM players WHERE lower(email) = lower(?)",
+    [normalizedEmail],
+  );
+  if (existingEmail) return { error: "That email is already registered. Log in instead." };
 
   const created = await db().one<{ id: number }>(
-    "INSERT INTO players (username, password_hash) VALUES (?, ?) RETURNING id",
-    [username, hashPassword(password)],
+    "INSERT INTO players (username, email, password_hash) VALUES (?, ?, ?) RETURNING id",
+    [username, normalizedEmail, hashPassword(password)],
   );
   const playerId = created!.id;
   await setSession(playerId);

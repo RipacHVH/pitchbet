@@ -90,6 +90,7 @@ export function ensureSchema(): Promise<void> {
         id SERIAL PRIMARY KEY,
         token TEXT UNIQUE,
         username TEXT UNIQUE NOT NULL,
+        email TEXT UNIQUE,
         balance REAL NOT NULL DEFAULT 1000,
         rp INTEGER NOT NULL DEFAULT 0,
         arena_wins INTEGER NOT NULL DEFAULT 0,
@@ -98,6 +99,8 @@ export function ensureSchema(): Promise<void> {
         avatar TEXT,
         created_at TIMESTAMPTZ NOT NULL DEFAULT now()
       );
+      -- Already-deployed databases predate the email column; add it if missing.
+      ALTER TABLE players ADD COLUMN IF NOT EXISTS email TEXT UNIQUE;
 
       CREATE TABLE IF NOT EXISTS fixtures (
         id TEXT PRIMARY KEY,
@@ -205,6 +208,7 @@ export interface PlayerRow {
   id: number;
   token: string | null;
   username: string;
+  email: string | null;
   balance: number;
   rp: number;
   arena_wins: number;

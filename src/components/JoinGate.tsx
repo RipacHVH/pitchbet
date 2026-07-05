@@ -13,6 +13,7 @@ export function JoinGate({
 }) {
   const [mode, setMode] = useState<"new" | "login">("new");
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +24,9 @@ export function JoinGate({
     const res = await fetch(mode === "new" ? "/api/join" : "/api/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: name, password }),
+      body: JSON.stringify(
+        mode === "new" ? { username: name, email, password } : { username: name, password },
+      ),
     });
     setBusy(false);
     if (!res.ok) {
@@ -33,7 +36,9 @@ export function JoinGate({
     onJoined();
   };
 
-  const canSubmit = name.trim().length >= 3 && password.length >= 6;
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const canSubmit =
+    name.trim().length >= 3 && password.length >= 6 && (mode === "login" || emailValid);
 
   const card = (
     <div className="pop-in w-full max-w-sm rounded-3xl border-2 border-white/15 bg-night-700 p-6 text-center shadow-[0_10px_0_rgba(0,0,0,.4)]">
@@ -73,6 +78,16 @@ export function JoinGate({
         aria-label="Manager name"
         className="mt-3 w-full rounded-2xl border-2 border-white/15 bg-night-900 px-4 py-3 text-center font-bold text-white placeholder:text-lilac-400/50 focus:border-gold-400 focus:outline-none"
       />
+      {mode === "new" && (
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Email address"
+          aria-label="Email address"
+          className="mt-2 w-full rounded-2xl border-2 border-white/15 bg-night-900 px-4 py-3 text-center font-bold text-white placeholder:text-lilac-400/50 focus:border-gold-400 focus:outline-none"
+        />
+      )}
       <input
         type="password"
         value={password}

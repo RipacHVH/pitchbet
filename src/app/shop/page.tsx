@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { Coin, Hud } from "@/components/Hud";
 import { JoinGate } from "@/components/JoinGate";
 import { ManagerAvatar } from "@/components/ManagerAvatar";
@@ -12,6 +12,7 @@ import {
   type AvatarConfig,
 } from "@/lib/avatar";
 import { SHOP_ITEMS, type ShopItem, type Slot } from "@/lib/shop";
+import { useMe } from "@/lib/MeContext";
 import type { Me } from "@/lib/types";
 
 const HAIR_STYLES = ["Clean shave", "Short", "Spiky", "Curly", "Flow"];
@@ -23,24 +24,15 @@ const SECTIONS: { slot: Slot; title: string }[] = [
 ];
 
 export default function ShopPage() {
-  const [me, setMe] = useState<Me | null>(null);
+  const { me, loaded: meLoaded, refresh: refreshMe, update: updateMe } = useMe();
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [busyItem, setBusyItem] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    const res = await fetch("/api/me");
-    if (res.ok) setMe(await res.json());
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
 
   const avatar = me?.avatar ?? DEFAULT_AVATAR;
   const owned = new Set(me?.ownedItems ?? []);
 
   const saveAvatar = async (next: AvatarConfig) => {
-    setMe((m) => (m ? { ...m, avatar: next } : m)); // optimistic
+    updateMe((m) => (m ? { ...m, avatar: next } : m)); // optimistic
     const res = await fetch("/api/avatar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -48,7 +40,7 @@ export default function ShopPage() {
     });
     if (!res.ok) {
       setNotice({ kind: "err", text: (await res.json()).message ?? "Couldn't save your look." });
-      await load();
+      await refreshMe();
     }
   };
 
@@ -66,7 +58,7 @@ export default function ShopPage() {
       setNotice({ kind: "err", text: body.message ?? "Purchase failed." });
       return;
     }
-    setMe((m) =>
+    updateMe((m) =>
       m
         ? { ...m, balance: body.newBalance, ownedItems: [...(m.ownedItems ?? []), item.id] }
         : m,
@@ -91,14 +83,7 @@ export default function ShopPage() {
 
   return (
     <div className="min-h-dvh pb-16">
-      <Hud
-        balance={me?.balance ?? null}
-        openBets={me?.openBets ?? 0}
-        joined={me?.joined ?? false}
-        username={me?.username}
-        avatar={me?.avatar}
-        onAuthChange={load}
-      />
+      <Hud />
 
       <main className="mx-auto max-w-2xl px-4">
         <section className="pb-5 pt-8 text-center">
@@ -122,10 +107,10 @@ export default function ShopPage() {
           </div>
         )}
 
-        {me === null ? (
+        {!meLoaded ? (
           <p className="py-16 text-center font-bold text-lilac-400">Unlocking the door…</p>
-        ) : !me.joined ? (
-          <JoinGate onJoined={load} />
+        ) : !me?.joined ? (
+          <JoinGate onJoined={refreshMe} />
         ) : (
           <>
             {/* Your manager */}

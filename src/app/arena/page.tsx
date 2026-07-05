@@ -8,6 +8,7 @@ import { JoinGate } from "@/components/JoinGate";
 import { RankBadge } from "@/components/RankBadge";
 import { ManagerAvatar } from "@/components/ManagerAvatar";
 import { parseAvatar } from "@/lib/avatar";
+import { useMe } from "@/lib/MeContext";
 import type {
   ArenaBet,
   ArenaInfo,
@@ -15,7 +16,6 @@ import type {
   ArenaStanding,
   Fixture,
   LeaderboardResponse,
-  Me,
   Selection,
 } from "@/lib/types";
 
@@ -28,19 +28,17 @@ function pointsLabel(points: number): string {
 }
 
 export default function ArenaPage() {
-  const [me, setMe] = useState<Me | null>(null);
+  const { me, loaded: meLoaded, refresh: refreshMe } = useMe();
   const [data, setData] = useState<ArenaResponse | null>(null);
   const [board, setBoard] = useState<LeaderboardResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
   const load = useCallback(async () => {
-    const [meRes, arenaRes, boardRes] = await Promise.all([
-      fetch("/api/me"),
+    const [arenaRes, boardRes] = await Promise.all([
       fetch("/api/arena"),
       fetch("/api/leaderboard"),
     ]);
-    if (meRes.ok) setMe(await meRes.json());
     if (arenaRes.ok) setData(await arenaRes.json());
     if (boardRes.ok) setBoard(await boardRes.json());
   }, []);
@@ -50,6 +48,10 @@ export default function ArenaPage() {
     const t = setInterval(load, 30_000);
     return () => clearInterval(t);
   }, [load]);
+
+  const handleJoined = async () => {
+    await Promise.all([refreshMe(), load()]);
+  };
 
   const enterArena = async (arenaId: number) => {
     setBusy(true);
@@ -87,7 +89,7 @@ export default function ArenaPage() {
           ? "🏁 Full time! The table is final — rank points are in the books."
           : "The table updates as matches finish. No new final whistles yet.",
     });
-    await load();
+    await Promise.all([load(), refreshMe()]);
   };
 
   const joined = me?.joined === true;
@@ -96,14 +98,7 @@ export default function ArenaPage() {
 
   return (
     <div className="min-h-dvh pb-16">
-      <Hud
-        balance={me?.balance ?? null}
-        openBets={me?.openBets ?? 0}
-        joined={me?.joined ?? false}
-        username={me?.username}
-        avatar={me?.avatar}
-        onAuthChange={load}
-      />
+      <Hud />
 
       <main className="mx-auto max-w-2xl px-4">
         <section className="pb-5 pt-8 text-center">
@@ -133,10 +128,10 @@ export default function ArenaPage() {
           </div>
         )}
 
-        {me === null || data === null ? (
+        {!meLoaded || data === null ? (
           <p className="py-16 text-center font-bold text-lilac-400">Opening the gates…</p>
         ) : !joined ? (
-          <JoinGate onJoined={load} />
+          <JoinGate onJoined={handleJoined} />
         ) : current ? (
           <ArenaBoard
             info={current}

@@ -6,8 +6,9 @@ import { TeamBadge } from "@/components/TeamBadge";
 import { Countdown } from "@/components/Countdown";
 import { JoinGate } from "@/components/JoinGate";
 import { SpinWheel } from "@/components/SpinWheel";
+import { useMe } from "@/lib/MeContext";
 import Link from "next/link";
-import type { Fixture, FixturesResponse, Me, Selection } from "@/lib/types";
+import type { Fixture, FixturesResponse, Selection } from "@/lib/types";
 
 interface SlipState {
   fixture: Fixture;
@@ -20,8 +21,8 @@ function shortName(team: string): string {
 }
 
 export default function PlayPage() {
+  const { me, refresh: refreshMe, update: updateMe } = useMe();
   const [data, setData] = useState<FixturesResponse | null>(null);
-  const [me, setMe] = useState<Me | null>(null);
   const [slip, setSlip] = useState<SlipState | null>(null);
   const [stake, setStake] = useState(50);
   const [placing, setPlacing] = useState(false);
@@ -30,20 +31,14 @@ export default function PlayPage() {
   const [pulse, setPulse] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
 
-  const loadMe = useCallback(async () => {
-    const res = await fetch("/api/me");
-    if (res.ok) setMe(await res.json());
-  }, []);
-
   const loadFixtures = useCallback(async (force = false) => {
     const res = await fetch(`/api/fixtures${force ? "?refresh=1" : ""}`);
     if (res.ok) setData(await res.json());
   }, []);
 
   useEffect(() => {
-    loadMe();
     loadFixtures();
-  }, [loadMe, loadFixtures]);
+  }, [loadFixtures]);
 
   const maxStake = useMemo(() => Math.max(10, Math.floor(me?.balance ?? 10)), [me]);
 
@@ -86,7 +81,7 @@ export default function PlayPage() {
         : slip.selection === "away"
           ? slip.fixture.away_team
           : "the draw";
-    setMe((m) =>
+    updateMe((m) =>
       m ? { ...m, balance: body.newBalance, openBets: (m.openBets ?? 0) + 1 } : m,
     );
     setSlip(null);
@@ -97,28 +92,20 @@ export default function PlayPage() {
 
   const handleJoined = async () => {
     setShowJoin(false);
-    await loadMe();
+    await refreshMe();
   };
 
   const [showWheel, setShowWheel] = useState(false);
 
   const onSpinDone = (_prize: number, newBalance: number) => {
-    setMe((m) => (m ? { ...m, balance: newBalance, spinAvailable: false } : m));
+    updateMe((m) => (m ? { ...m, balance: newBalance, spinAvailable: false } : m));
     setPulse(true);
     setTimeout(() => setPulse(false), 1200);
   };
 
   return (
     <div className="min-h-dvh pb-64">
-      <Hud
-        balance={me?.balance ?? null}
-        openBets={me?.openBets ?? 0}
-        pulse={pulse}
-        joined={me?.joined ?? false}
-        username={me?.username}
-        avatar={me?.avatar}
-        onAuthChange={loadMe}
-      />
+      <Hud pulse={pulse} />
 
       <main className="mx-auto max-w-2xl px-4">
         {/* Hero */}

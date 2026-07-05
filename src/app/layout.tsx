@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Archivo, Nunito, Geist_Mono } from "next/font/google";
+import { AppProviders } from "@/components/AppProviders";
 import "./globals.css";
 
 const archivo = Archivo({
@@ -45,7 +46,7 @@ export default function RootLayout({
           aria-hidden
           className="pointer-events-none fixed -bottom-[60vh] left-1/2 -z-10 h-[110vh] w-[220vw] -translate-x-1/2 rounded-[50%] border-2 border-white/[0.04]"
         />
-        {children}
+        <AppProviders>{children}</AppProviders>
       </body>
     </html>
   );

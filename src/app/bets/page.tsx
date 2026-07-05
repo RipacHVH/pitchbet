@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Coin, Hud } from "@/components/Hud";
 import { TeamBadge } from "@/components/TeamBadge";
 import { JoinGate } from "@/components/JoinGate";
-import type { Bet, Me } from "@/lib/types";
+import { useMe } from "@/lib/MeContext";
+import type { Bet } from "@/lib/types";
 
 const STAMP: Record<Bet["status"], { label: string; cls: string }> = {
   open: { label: "In play", cls: "text-lilac-300" },
@@ -14,21 +15,24 @@ const STAMP: Record<Bet["status"], { label: string; cls: string }> = {
 };
 
 export default function TicketsPage() {
+  const { me, loaded: meLoaded, refresh: refreshMe } = useMe();
   const [bets, setBets] = useState<Bet[] | null>(null);
-  const [me, setMe] = useState<Me | null>(null);
   const [settling, setSettling] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    const [betsRes, meRes] = await Promise.all([fetch("/api/bets"), fetch("/api/me")]);
-    if (betsRes.ok) setBets((await betsRes.json()).bets);
-    else if (betsRes.status === 401) setBets([]);
-    if (meRes.ok) setMe(await meRes.json());
+  const loadBets = useCallback(async () => {
+    const res = await fetch("/api/bets");
+    if (res.ok) setBets((await res.json()).bets);
+    else if (res.status === 401) setBets([]);
   }, []);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    loadBets();
+  }, [loadBets]);
+
+  const handleJoined = async () => {
+    await Promise.all([refreshMe(), loadBets()]);
+  };
 
   const settle = async () => {
     setSettling(true);
@@ -45,7 +49,7 @@ export default function TicketsPage() {
         ? "No final whistles yet — come back after full time."
         : `${s.won > 0 ? `🏆 ${s.won} winner${s.won === 1 ? "" : "s"}! ` : ""}${s.settled} ticket${s.settled === 1 ? "" : "s"} settled${s.voided ? `, ${s.voided} refunded` : ""}.`,
     );
-    await load();
+    await Promise.all([loadBets(), refreshMe()]);
   };
 
   const record = (bets ?? []).reduce(
@@ -60,14 +64,7 @@ export default function TicketsPage() {
 
   return (
     <div className="min-h-dvh pb-16">
-      <Hud
-        balance={me?.balance ?? null}
-        openBets={me?.openBets ?? 0}
-        joined={me?.joined ?? false}
-        username={me?.username}
-        avatar={me?.avatar}
-        onAuthChange={load}
-      />
+      <Hud />
 
       <main className="mx-auto max-w-2xl px-4">
         <div className="flex items-end justify-between pb-4 pt-8">
@@ -99,8 +96,8 @@ export default function TicketsPage() {
           </div>
         )}
 
-        {me && !me.joined ? (
-          <JoinGate onJoined={load} />
+        {meLoaded && !me?.joined ? (
+          <JoinGate onJoined={handleJoined} />
         ) : !bets ? (
           <p className="py-16 text-center font-bold text-lilac-400">Opening the vault…</p>
         ) : bets.length === 0 ? (

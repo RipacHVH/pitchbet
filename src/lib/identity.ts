@@ -72,7 +72,7 @@ export async function registerPlayer(
     "SELECT id FROM players WHERE lower(username) = lower(?)",
     [username],
   );
-  if (existingName) return { error: "That name is already managing a club. Pick another or log in." };
+  if (existingName) return { error: "That name is already taken. Pick another or log in." };
 
   const existingEmail = await db().one<{ id: number }>(
     "SELECT id FROM players WHERE lower(email) = lower(?)",
@@ -99,7 +99,7 @@ export async function loginPlayer(rawName: string, password: string): Promise<Au
   const player = await db().one<PlayerRow>("SELECT * FROM players WHERE lower(username) = lower(?)", [
     username,
   ]);
-  if (!player) return { error: "No manager by that name. Create one instead." };
+  if (!player) return { error: "No player by that name. Create one instead." };
 
   if (player.password_hash === null) {
     if (typeof password !== "string" || password.length < 6) {

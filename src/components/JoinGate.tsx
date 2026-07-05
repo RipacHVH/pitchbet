@@ -42,14 +42,14 @@ export function JoinGate({
 
   const card = (
     <div className="pop-in w-full max-w-sm rounded-3xl border-2 border-white/15 bg-night-700 p-6 text-center shadow-[0_10px_0_rgba(0,0,0,.4)]">
-      <p className="text-4xl">🧢</p>
+      <p className="text-4xl">⚽</p>
       <h2 className="display mt-2 text-2xl text-white">
-        {mode === "new" ? "Take the job" : "Back in the dugout"}
+        {mode === "new" ? "Join the game" : "Welcome back"}
       </h2>
       <p className="mt-1 text-sm font-semibold text-lilac-300">
         {mode === "new"
           ? "Every legend starts in the Sunday League."
-          : "Log in from any device — your career follows you."}
+          : "Log in from any device — your progress follows you."}
       </p>
 
       <div className="mt-4 grid grid-cols-2 gap-1 rounded-2xl bg-night-900 p-1">
@@ -64,7 +64,7 @@ export function JoinGate({
               mode === m ? "bg-gold-400 text-night-950" : "text-lilac-300 hover:text-white"
             }`}
           >
-            {m === "new" ? "New manager" : "Log in"}
+            {m === "new" ? "New player" : "Log in"}
           </button>
         ))}
       </div>
@@ -72,10 +72,10 @@ export function JoinGate({
       <input
         value={name}
         onChange={(e) => setName(e.target.value)}
-        placeholder="Manager name"
+        placeholder="Player name"
         maxLength={16}
         autoFocus
-        aria-label="Manager name"
+        aria-label="Player name"
         className="mt-3 w-full rounded-2xl border-2 border-white/15 bg-night-900 px-4 py-3 text-center font-bold text-white placeholder:text-lilac-400/50 focus:border-gold-400 focus:outline-none"
       />
       {mode === "new" && (
@@ -106,7 +106,7 @@ export function JoinGate({
         {busy
           ? "One moment…"
           : mode === "new"
-            ? "Start my career"
+            ? "Start playing"
             : "Log in"}
       </button>
       {modal && onClose && (

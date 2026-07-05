@@ -185,7 +185,7 @@ function ArenaBoard({
         <div>
           <p className="display text-lg text-white">{info.arena.name}</p>
           <p className="text-xs font-bold text-lilac-300">
-            {info.fixtures.length} matches · {info.standings.length} manager
+            {info.fixtures.length} matches · {info.standings.length} player
             {info.standings.length === 1 ? "" : "s"} in
           </p>
         </div>

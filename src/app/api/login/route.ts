@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: "Invalid JSON body" }, { status: 400 });
   }
   if (!body.username || !body.password) {
-    return NextResponse.json({ message: "Manager name and password are required" }, { status: 400 });
+    return NextResponse.json({ message: "Player name and password are required" }, { status: 400 });
   }
 
   const result = await loginPlayer(body.username, body.password);

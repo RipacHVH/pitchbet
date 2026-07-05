@@ -4,7 +4,7 @@ import { currentPlayer } from "@/lib/identity";
 
 export async function POST(req: NextRequest) {
   const player = await currentPlayer();
-  if (!player) return NextResponse.json({ message: "Pick a manager name first" }, { status: 401 });
+  if (!player) return NextResponse.json({ message: "Pick a player name first" }, { status: 401 });
 
   let body: { arenaId?: number };
   try {

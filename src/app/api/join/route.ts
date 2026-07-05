@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
   }
   if (!body.username || !body.email || !body.password) {
     return NextResponse.json(
-      { message: "Manager name, email and password are required" },
+      { message: "Player name, email and password are required" },
       { status: 400 },
     );
   }

@@ -11,7 +11,7 @@ services:
     plan: free
     buildCommand: npm install && npm run build
     startCommand: npm start
-    healthCheckPath: /api/me
+    healthCheckPath: /api/health
     envVars:
       - key: DATABASE_URL
         sync: false # paste your Supabase "Transaction pooler" URI in the dashboard

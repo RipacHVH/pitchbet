@@ -110,7 +110,15 @@ export default function PlayPage() {
 
   return (
     <div className="min-h-dvh pb-64">
-      <Hud balance={me?.balance ?? null} openBets={me?.openBets ?? 0} pulse={pulse} />
+      <Hud
+        balance={me?.balance ?? null}
+        openBets={me?.openBets ?? 0}
+        pulse={pulse}
+        joined={me?.joined ?? false}
+        username={me?.username}
+        avatar={me?.avatar}
+        onAuthChange={loadMe}
+      />
 
       <main className="mx-auto max-w-2xl px-4">
         {/* Hero */}

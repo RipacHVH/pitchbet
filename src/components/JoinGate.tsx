@@ -6,12 +6,14 @@ export function JoinGate({
   onJoined,
   modal = false,
   onClose,
+  initialMode = "new",
 }: {
   onJoined: () => void;
   modal?: boolean;
   onClose?: () => void;
+  initialMode?: "new" | "login";
 }) {
-  const [mode, setMode] = useState<"new" | "login">("new");
+  const [mode, setMode] = useState<"new" | "login">(initialMode);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

@@ -91,7 +91,14 @@ export default function ShopPage() {
 
   return (
     <div className="min-h-dvh pb-16">
-      <Hud balance={me?.balance ?? null} openBets={me?.openBets ?? 0} />
+      <Hud
+        balance={me?.balance ?? null}
+        openBets={me?.openBets ?? 0}
+        joined={me?.joined ?? false}
+        username={me?.username}
+        avatar={me?.avatar}
+        onAuthChange={load}
+      />
 
       <main className="mx-auto max-w-2xl px-4">
         <section className="pb-5 pt-8 text-center">

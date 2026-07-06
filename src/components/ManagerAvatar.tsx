@@ -24,6 +24,11 @@ function shade(hex: string, amt: number): string {
   return `#${mix((n >> 16) & 255)}${mix((n >> 8) & 255)}${mix(n & 255)}`;
 }
 
+function luminance(hex: string): number {
+  const n = parseInt(hex.slice(1), 16);
+  return (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+}
+
 const SHIRT = "M12 64 Q12 44 32 44 Q52 44 52 64 Z";
 
 /**
@@ -39,6 +44,9 @@ export function ManagerAvatar({ config, size = 40 }: { config: AvatarConfig; siz
   const skin = SKIN_TONES[config.skin % SKIN_TONES.length];
   const hairC = HAIR_COLORS[config.hairColor % HAIR_COLORS.length];
   const kit = kitColor(config.kit);
+  // Jersey trim flips light/dark depending on the shirt colour
+  const trim = luminance(kit) > 0.62 ? shade(kit, -0.55) : "#f4f4f8";
+  const isBasicKit = config.kit.startsWith("basic-");
 
   return (
     <svg
@@ -126,7 +134,6 @@ export function ManagerAvatar({ config, size = 40 }: { config: AvatarConfig; siz
 
         {config.kit === "kit-keeper" && (
           <g>
-            {/* keeper chevrons */}
             <path d="M12 57 L32 50.5 L52 57 L52 60.4 L32 54 L12 60.4 Z" fill="#1d4d12" opacity="0.85" />
             <path d="M12 63 L32 56.5 L52 63 L52 64 L12 64 Z" fill="#1d4d12" opacity="0.6" />
             <path d="M12 55.9 L32 49.4 L52 55.9" stroke="#d9ffc8" strokeWidth="0.7" fill="none" opacity="0.7" />
@@ -174,7 +181,6 @@ export function ManagerAvatar({ config, size = 40 }: { config: AvatarConfig; siz
           <g>
             <path d={SHIRT} fill={url("gold")} />
             <path d={SHIRT} fill={url("sheen")} opacity="0.5" />
-            {/* embossed chest star */}
             <path
               d="M24.5 51.2 L25.6 53.4 L28 53.7 L26.2 55.4 L26.7 57.8 L24.5 56.6 L22.3 57.8 L22.8 55.4 L21 53.7 L23.4 53.4 Z"
               fill="#a06e08"
@@ -187,33 +193,59 @@ export function ManagerAvatar({ config, size = 40 }: { config: AvatarConfig; siz
           </g>
         )}
 
-        {/* fabric rounding + sleeve seams on every kit */}
+        {/* fabric rounding + sleeve seams + shoulder seams on every kit */}
         <path d={SHIRT} fill={url("cloth")} />
         <path d="M18.5 47.5 Q17 54 17.3 64" stroke="#000" strokeWidth="0.8" opacity="0.18" fill="none" />
         <path d="M45.5 47.5 Q47 54 46.7 64" stroke="#000" strokeWidth="0.8" opacity="0.18" fill="none" />
+        <path d="M25.4 44.9 Q21 46.5 19.1 49.7" stroke="#000" strokeWidth="0.7" opacity="0.15" fill="none" />
+        <path d="M38.6 44.9 Q43 46.5 44.9 49.7" stroke="#000" strokeWidth="0.7" opacity="0.15" fill="none" />
 
-        {/* collar: shaded V with a lit rim */}
-        <path d="M26 45 L32 50.5 L38 45 L38 48 L32 53.2 L26 48 Z" fill="rgba(0,0,0,.32)" />
-        <path d="M26.3 45.2 L32 50.2 L37.7 45.2" stroke="#ffffff" strokeWidth="0.8" fill="none" opacity="0.35" />
+        {/* club crest on plain kits */}
+        {isBasicKit && (
+          <g>
+            <path d="M22.3 50.2 L27 50.2 L27 53.4 Q27 55.3 24.65 56.1 Q22.3 55.3 22.3 53.4 Z" fill={trim} />
+            <path d="M22.9 50.8 L26.4 50.8 L26.4 53.3 Q26.4 54.7 24.65 55.35 Q22.9 54.7 22.9 53.3 Z" fill={shade(kit, -0.4)} />
+            <circle cx="24.65" cy="52.7" r="0.95" fill={trim} />
+          </g>
+        )}
+
+        {/* ---------------- neck ---------------- */}
+        <path d="M28 35 L36 35 L36 46.2 Q32 48.4 28 46.2 Z" fill={url("skin")} />
+        <ellipse cx="32" cy="42.4" rx="3.5" ry="1.5" fill="#000" opacity="0.2" />
+
+        {/* V-neck collar with double trim */}
+        <path d="M25.2 44.4 L32 50.8 L38.8 44.4 L38.8 47.6 L32 54 L25.2 47.6 Z" fill={shade(kit, -0.5)} />
+        <path d="M25.9 45 L32 50.6 L38.1 45" stroke={trim} strokeWidth="1.15" fill="none" />
+        <path d="M25.9 46.8 L32 52.4 L38.1 46.8" stroke={trim} strokeWidth="0.6" fill="none" opacity="0.75" />
 
         {/* ---------------- head ---------------- */}
         <circle cx="19.5" cy="28" r="2.5" fill={url("skin")} />
         <circle cx="44.5" cy="28" r="2.5" fill={url("skin")} />
         <circle cx="32" cy="28" r="13" fill={url("skin")} />
-        {/* soft jaw shadow above the collar */}
-        <path d="M23 37 Q32 43.5 41 37 Q37 41 32 41 Q27 41 23 37 Z" fill="#000" opacity="0.10" />
+        {/* inner ears */}
+        <path d="M18.6 26.9 Q17.9 28 18.6 29.1" stroke={shade(skin, -0.28)} strokeWidth="0.7" fill="none" strokeLinecap="round" />
+        <path d="M45.4 26.9 Q46.1 28 45.4 29.1" stroke={shade(skin, -0.28)} strokeWidth="0.7" fill="none" strokeLinecap="round" />
+        {/* bald head shine */}
+        {config.hair === 0 && (
+          <path d="M25 20 Q27.4 16.6 31.4 16.1" stroke="#fff" strokeWidth="2.2" fill="none" opacity="0.3" strokeLinecap="round" />
+        )}
 
         {/* hair styles: 0 bald, 1 short, 2 spiky, 3 curly, 4 long */}
         {config.hair === 1 && (
-          <g>
-            <path d="M19 27 Q20 15 32 15 Q44 15 45 27 Q44 20 32 19 Q20 20 19 27 Z" fill={url("hairg")} />
-            <path d="M23 18.5 Q27 16 31 16" stroke={shade(hairC, 0.4)} strokeWidth="0.9" fill="none" opacity="0.7" strokeLinecap="round" />
+          <g fill={url("hairg")}>
+            <path d="M19 27 Q20 15.4 32 15 Q44 15.4 45 27 Q44 20.3 32 19.6 Q20 20.3 19 27 Z" />
+            {/* scalloped fringe */}
+            <path d="M21.4 20.9 Q23.2 23.6 25.9 21.2 Q23.6 19.8 21.4 20.9 Z" />
+            <path d="M26.7 21.2 Q29 24.1 31.7 21.3 Q29.1 19.7 26.7 21.2 Z" />
+            <path d="M32.3 21.3 Q35 24 37.3 21.2 Q34.9 19.7 32.3 21.3 Z" />
+            <path d="M38.1 21.2 Q40.4 23.4 42.6 20.9 Q40.4 19.8 38.1 21.2 Z" />
+            <path d="M23 18.4 Q27 16.2 31 16.2" stroke={shade(hairC, 0.4)} strokeWidth="0.9" fill="none" opacity="0.7" strokeLinecap="round" />
           </g>
         )}
         {config.hair === 2 && (
           <g>
             <path d="M19 26 L22 17 L25 22 L28 14 L32 20 L36 14 L39 22 L42 17 L45 26 Q40 17 32 17 Q24 17 19 26 Z" fill={url("hairg")} />
-            <path d="M27.6 15.5 L28 14.6" stroke={shade(hairC, 0.45)} strokeWidth="1" strokeLinecap="round" opacity="0.8" />
+            <path d="M27.6 15.5 L28 14.6 M35.6 15.6 L36 14.7" stroke={shade(hairC, 0.45)} strokeWidth="1" strokeLinecap="round" opacity="0.8" />
           </g>
         )}
         {config.hair === 3 && (
@@ -223,32 +255,56 @@ export function ManagerAvatar({ config, size = 40 }: { config: AvatarConfig; siz
             <circle cx="38" cy="17.5" r="4.5" />
             <circle cx="43" cy="23" r="4" />
             <circle cx="20" cy="25" r="3.5" />
+            {/* forehead puffs */}
+            <circle cx="26.5" cy="20.3" r="2.9" />
+            <circle cx="33.8" cy="19.8" r="3.1" />
+            <circle cx="40" cy="20.6" r="2.6" />
             <circle cx="28.6" cy="15.2" r="1.1" fill={shade(hairC, 0.4)} opacity="0.8" />
-            <circle cx="22" cy="18.8" r="0.9" fill={shade(hairC, 0.4)} opacity="0.7" />
+            <circle cx="25.4" cy="19.2" r="0.9" fill={shade(hairC, 0.4)} opacity="0.7" />
+            <circle cx="36.7" cy="16.4" r="0.9" fill={shade(hairC, 0.4)} opacity="0.7" />
           </g>
         )}
         {config.hair === 4 && (
-          <g>
-            <path d="M18 40 Q16 16 32 15 Q48 16 46 40 L42 40 Q44 22 32 20 Q20 22 22 40 Z" fill={url("hairg")} />
+          <g fill={url("hairg")}>
+            <path d="M18 40 Q16 16 32 15 Q48 16 46 40 L42 40 Q44 22 32 20 Q20 22 22 40 Z" />
+            {/* centre-parted curtains */}
+            <path d="M31.6 16.4 Q25 17.8 23.6 24.6 Q27.6 21 31.6 20.8 Z" />
+            <path d="M32.4 16.4 Q39 17.8 40.4 24.6 Q36.4 21 32.4 20.8 Z" />
             <path d="M20.5 30 Q19.8 22 25 18.5" stroke={shade(hairC, 0.35)} strokeWidth="0.9" fill="none" opacity="0.7" strokeLinecap="round" />
+            <path d="M43.6 29 Q44 23 40.5 19.6" stroke={shade(hairC, 0.35)} strokeWidth="0.8" fill="none" opacity="0.6" strokeLinecap="round" />
           </g>
         )}
 
-        {/* face */}
-        <circle cx="27" cy="27.5" r="1.6" fill="#241a2e" />
-        <circle cx="37" cy="27.5" r="1.6" fill="#241a2e" />
-        <circle cx="27.5" cy="27" r="0.5" fill="#fff" opacity="0.85" />
-        <circle cx="37.5" cy="27" r="0.5" fill="#fff" opacity="0.85" />
-        <path d="M27.5 34 Q32 37.5 36.5 34" stroke="#241a2e" strokeWidth="1.6" fill="none" strokeLinecap="round" />
+        {/* ---------------- face ---------------- */}
+        {/* brows */}
+        <path d="M24.8 23.9 Q27 22.7 29.2 23.7" stroke={hairC} strokeWidth="1.5" fill="none" strokeLinecap="round" />
+        <path d="M34.8 23.7 Q37 22.7 39.2 23.9" stroke={hairC} strokeWidth="1.5" fill="none" strokeLinecap="round" />
+        {/* big friendly eyes: sclera, iris, double highlight */}
+        <ellipse cx="27" cy="27.6" rx="2.5" ry="3" fill="#fff" stroke={shade(skin, -0.3)} strokeWidth="0.3" />
+        <ellipse cx="37" cy="27.6" rx="2.5" ry="3" fill="#fff" stroke={shade(skin, -0.3)} strokeWidth="0.3" />
+        <circle cx="27.4" cy="28.1" r="1.6" fill="#38264a" />
+        <circle cx="37.4" cy="28.1" r="1.6" fill="#38264a" />
+        <circle cx="26.85" cy="27.35" r="0.62" fill="#fff" />
+        <circle cx="36.85" cy="27.35" r="0.62" fill="#fff" />
+        <circle cx="28.1" cy="29" r="0.3" fill="#fff" opacity="0.8" />
+        <circle cx="38.1" cy="29" r="0.3" fill="#fff" opacity="0.8" />
+        {/* button nose */}
+        <ellipse cx="32" cy="30.9" rx="1.15" ry="0.9" fill={shade(skin, -0.16)} />
+        <circle cx="31.6" cy="30.6" r="0.35" fill="#fff" opacity="0.55" />
+        {/* rosy cheeks */}
+        <ellipse cx="23.2" cy="31.4" rx="2" ry="1.25" fill="#ff6f61" opacity="0.3" />
+        <ellipse cx="40.8" cy="31.4" rx="2" ry="1.25" fill="#ff6f61" opacity="0.3" />
+        {/* open smile: mouth, teeth, tongue */}
+        <path d="M27.4 33.3 Q32 39.9 36.6 33.3 Q32 35.7 27.4 33.3 Z" fill="#6d2836" />
+        <path d="M28.5 34 Q32 36.2 35.5 34 L35.1 35 Q32 36.9 28.9 35 Z" fill="#fff" opacity="0.95" />
+        <path d="M29.7 36.3 Q32 38.7 34.3 36.3 Q32 35.3 29.7 36.3 Z" fill="#e8756b" />
 
         {/* ---------------- extras ---------------- */}
         {config.extra === "extra-shades" && (
           <g>
-            {/* gold frame: top bar + bridge + temples to the ears */}
             <path d="M20.5 24.6 L43.5 24.6" stroke="#e0b23e" strokeWidth="1.1" strokeLinecap="round" />
             <path d="M30.4 27.2 Q32 26 33.6 27.2" stroke="#e0b23e" strokeWidth="1" fill="none" />
             <path d="M21 25.4 L19.4 26.6 M43 25.4 L44.6 26.6" stroke="#c89a2e" strokeWidth="0.9" strokeLinecap="round" />
-            {/* lenses with sky reflection + glint */}
             <rect x="21.6" y="24.4" width="9.2" height="6.2" rx="2.6" fill={url("lens")} stroke="#e0b23e" strokeWidth="0.9" />
             <rect x="33.2" y="24.4" width="9.2" height="6.2" rx="2.6" fill={url("lens")} stroke="#e0b23e" strokeWidth="0.9" />
             <path d="M23.4 29.4 L27.4 25.1 M25.4 29.9 L28.9 26.1" stroke="#fff" strokeWidth="0.8" opacity="0.55" strokeLinecap="round" />
@@ -257,16 +313,12 @@ export function ManagerAvatar({ config, size = 40 }: { config: AvatarConfig; siz
         )}
         {config.extra === "extra-scarf" && (
           <g>
-            {/* hanging tail with stripes + fringe */}
             <path d="M36.5 47.5 L41.5 47 L44 59.5 L37.5 60 Z" fill={url("scarf")} />
             <path d="M37.8 51.8 L42.4 51.3 M38.6 55.3 L43.2 54.8" stroke="#f3e3d3" strokeWidth="1.7" opacity="0.95" />
             <path d="M38.5 60 L38.3 62.5 M40.4 59.9 L40.4 62.4 M42.3 59.7 L42.6 62.2" stroke="#9c221e" strokeWidth="1.1" strokeLinecap="round" />
-            {/* neck wrap */}
             <path d="M18.5 44.5 Q32 51.5 45.5 44.5 L45.5 49.8 Q32 56.8 18.5 49.8 Z" fill={url("scarf")} />
             <path d="M18.5 44.7 Q32 51.7 45.5 44.7" stroke="#ffb1a6" strokeWidth="0.8" fill="none" opacity="0.6" />
-            {/* knit stripes */}
             <path d="M22.5 46.6 L24.5 44.1 M28.5 48.7 L30.5 46.2 M34.5 48.7 L36.5 46.2 M40.5 46.6 L42.5 44.1" stroke="#f3e3d3" strokeWidth="1.9" strokeLinecap="round" />
-            {/* knit texture */}
             <path d="M19 47.8 Q32 54.6 45 47.8" stroke="#6d1512" strokeWidth="0.7" fill="none" opacity="0.45" />
           </g>
         )}
@@ -274,16 +326,13 @@ export function ManagerAvatar({ config, size = 40 }: { config: AvatarConfig; siz
           <g>
             <path d="M13 54.5 L21.5 50.8 L21.5 58 L13 61.6 Z" fill={url("gold")} stroke="#8a5f06" strokeWidth="0.7" />
             <path d="M13.4 55 L21.1 51.6" stroke="#fff3b8" strokeWidth="0.8" opacity="0.8" />
-            {/* the captain's C */}
             <path d="M19 54.2 Q16.2 53.6 16.2 56 Q16.2 58.4 19 57.8" stroke="#6b4a04" strokeWidth="1.5" fill="none" strokeLinecap="round" />
           </g>
         )}
         {config.extra === "extra-medal" && (
           <g>
-            {/* striped ribbon */}
             <path d="M28 45 L32 53.5 L36 45" stroke="#c93a3a" strokeWidth="3.6" fill="none" />
             <path d="M28 45 L32 53.5 L36 45" stroke="#f3e9e0" strokeWidth="1.2" fill="none" />
-            {/* disc with rim, emboss and glint */}
             <circle cx="32" cy="56.5" r="4.6" fill={url("gold")} stroke="#8a5f06" strokeWidth="0.9" />
             <circle cx="32" cy="56.5" r="3.3" fill="none" stroke="#a06e08" strokeWidth="0.5" opacity="0.8" />
             <path
@@ -298,11 +347,9 @@ export function ManagerAvatar({ config, size = 40 }: { config: AvatarConfig; siz
         {config.head === "head-cap" && (
           <g>
             <path d="M19 22 Q20 11.5 32 11.5 Q44 11.5 45 22 Z" fill={url("cap")} />
-            {/* panel seams + button */}
             <path d="M32 11.5 L32 22 M25.7 13.4 Q26.6 17.6 26.2 22 M38.3 13.4 Q37.4 17.6 37.8 22" stroke="#1a3166" strokeWidth="0.6" fill="none" opacity="0.9" />
             <circle cx="32" cy="11.4" r="1.1" fill="#1a3166" />
             <ellipse cx="26.5" cy="15" rx="3.4" ry="1.9" fill="#fff" opacity="0.22" transform="rotate(-18 26.5 15)" />
-            {/* brim: lit top + shaded underside */}
             <path d="M16.6 21.5 L47.4 21.5 Q50.6 21.8 50.1 24.1 Q49.7 25.6 47 25.3 L17 24.7 Z" fill="#2b4fa3" />
             <path d="M17 24.7 L47 25.3 Q49.7 25.6 50.1 24.1 Q49 26.4 46.5 26.1 L17.5 25.5 Z" fill="#152751" />
             <path d="M17.6 22.3 L46.6 22.3" stroke="#7d9ce8" strokeWidth="0.6" opacity="0.7" />
@@ -311,13 +358,10 @@ export function ManagerAvatar({ config, size = 40 }: { config: AvatarConfig; siz
         {config.head === "head-bucket" && (
           <g>
             <path d="M22 19.5 Q22.5 10.8 32 10.8 Q41.5 10.8 42 19.5 Z" fill={url("canvas")} />
-            {/* crown seam + stitching */}
             <path d="M22.6 17.2 Q32 15.2 41.4 17.2" stroke="#8a774f" strokeWidth="0.7" fill="none" />
             <path d="M23.2 16.4 Q32 14.4 40.8 16.4" stroke="#f3ead1" strokeWidth="0.5" strokeDasharray="0.9 1.1" fill="none" opacity="0.9" />
-            {/* eyelets */}
             <circle cx="27.5" cy="14" r="0.55" fill="#8a774f" />
             <circle cx="36.5" cy="14" r="0.55" fill="#8a774f" />
-            {/* sloped brim with stitched edge */}
             <path d="M15.5 19.5 L48.5 19.5 L46 25.4 Q32 27.2 18 25.4 Z" fill="#b39d72" />
             <path d="M15.5 19.5 L48.5 19.5 L48 20.7 L16 20.7 Z" fill="#c9b48a" />
             <path d="M17.2 24.1 Q32 25.9 46.8 24.1" stroke="#f3ead1" strokeWidth="0.55" strokeDasharray="1 1.2" fill="none" opacity="0.9" />
@@ -326,17 +370,14 @@ export function ManagerAvatar({ config, size = 40 }: { config: AvatarConfig; siz
         )}
         {config.head === "head-viking" && (
           <g>
-            {/* horns: ringed, curving out */}
             <path d="M19.5 21 Q11.8 16.5 13.6 7 Q20.4 10.6 21.8 18 Z" fill={url("bone")} stroke="#9c8a62" strokeWidth="0.6" />
             <path d="M44.5 21 Q52.2 16.5 50.4 7 Q43.6 10.6 42.2 18 Z" fill={url("bone")} stroke="#9c8a62" strokeWidth="0.6" />
             <path d="M15.5 13.5 Q18.5 13.9 20.6 15.8 M14.4 10 Q17.4 10.6 19.6 12.6" stroke="#9c8a62" strokeWidth="0.6" fill="none" opacity="0.8" />
             <path d="M48.5 13.5 Q45.5 13.9 43.4 15.8 M49.6 10 Q46.6 10.6 44.4 12.6" stroke="#9c8a62" strokeWidth="0.6" fill="none" opacity="0.8" />
-            {/* dome with central ridge */}
             <path d="M20 22 Q21 11.5 32 11.5 Q43 11.5 44 22 Z" fill={url("metal")} />
             <path d="M32 11.5 L32 22" stroke="#dde4ec" strokeWidth="1.8" />
             <path d="M32 11.5 L32 22" stroke="#59626d" strokeWidth="0.5" opacity="0.6" />
             <ellipse cx="26" cy="15" rx="3.2" ry="1.7" fill="#fff" opacity="0.35" transform="rotate(-20 26 15)" />
-            {/* riveted brow band */}
             <path d="M19.5 20.7 L44.5 20.7 L44.5 24 L19.5 24 Z" fill="#59626d" />
             <path d="M19.5 20.7 L44.5 20.7" stroke="#8f99a5" strokeWidth="0.6" />
             <circle cx="23" cy="22.4" r="0.7" fill="#c8d1da" />
@@ -347,28 +388,23 @@ export function ManagerAvatar({ config, size = 40 }: { config: AvatarConfig; siz
         )}
         {config.head === "head-halo" && (
           <g>
-            {/* layered glow, no filters needed */}
             <ellipse cx="32" cy="9.5" rx="12.5" ry="4" fill="none" stroke="#ffe9a3" strokeWidth="5" opacity="0.14" />
             <ellipse cx="32" cy="9.5" rx="11.6" ry="3.6" fill="none" stroke="#ffdf7e" strokeWidth="3" opacity="0.35" />
             <ellipse cx="32" cy="9.5" rx="11" ry="3.2" fill="none" stroke="#ffd75e" strokeWidth="1.9" />
             <ellipse cx="32" cy="9.1" rx="10.4" ry="2.7" fill="none" stroke="#fffbe8" strokeWidth="0.8" opacity="0.9" />
-            {/* sparkles */}
             <path d="M45.5 7 L46.1 8.4 L47.5 9 L46.1 9.6 L45.5 11 L44.9 9.6 L43.5 9 L44.9 8.4 Z" fill="#fff6d8" />
             <path d="M19 12.5 L19.4 13.4 L20.3 13.8 L19.4 14.2 L19 15.1 L18.6 14.2 L17.7 13.8 L18.6 13.4 Z" fill="#ffe9a3" opacity="0.9" />
           </g>
         )}
         {config.head === "head-crown" && (
           <g>
-            {/* points with pearls */}
             <path d="M21.5 17.5 L21.5 9.5 L26.5 13.8 L32 7 L37.5 13.8 L42.5 9.5 L42.5 17.5 Z" fill={url("gold")} stroke="#8a5f06" strokeWidth="0.8" strokeLinejoin="round" />
             <path d="M22.6 15.5 L22.6 11.6 M32 9 L32 13.5" stroke="#fff3b8" strokeWidth="0.7" opacity="0.7" />
             <circle cx="21.5" cy="9" r="1.4" fill={url("pearl")} stroke="#8a8fae" strokeWidth="0.3" />
             <circle cx="32" cy="6.4" r="1.5" fill={url("pearl")} stroke="#8a8fae" strokeWidth="0.3" />
             <circle cx="42.5" cy="9" r="1.4" fill={url("pearl")} stroke="#8a8fae" strokeWidth="0.3" />
-            {/* jewelled band */}
             <rect x="20.8" y="16.8" width="22.4" height="4.6" rx="1.2" fill={url("gold")} stroke="#8a5f06" strokeWidth="0.8" />
             <path d="M21.6 17.7 L42.4 17.7" stroke="#fff3b8" strokeWidth="0.7" opacity="0.8" />
-            {/* ruby / sapphire / emerald with glints */}
             <path d="M26 17.6 L27.5 19.1 L26 20.6 L24.5 19.1 Z" fill="#e04545" stroke="#7e1414" strokeWidth="0.4" />
             <circle cx="32" cy="19.1" r="1.5" fill="#3e63d8" stroke="#16265e" strokeWidth="0.4" />
             <path d="M38 17.6 L39.5 19.1 L38 20.6 L36.5 19.1 Z" fill="#2eae62" stroke="#0d4f28" strokeWidth="0.4" />

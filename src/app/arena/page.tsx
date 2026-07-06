@@ -15,6 +15,7 @@ import type {
   ArenaInfo,
   ArenaResponse,
   ArenaStanding,
+  Challenge,
   Fixture,
   LeaderboardResponse,
   Selection,
@@ -111,6 +112,34 @@ export default function ArenaPage() {
     await Promise.all([load(), refreshMe()]);
   };
 
+  const sendChallenge = async (arenaId: number, opponentUsername: string) => {
+    const res = await fetch("/api/challenges", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ arenaId, opponentUsername }),
+    });
+    const body = await res.json();
+    if (!res.ok) {
+      setNotice({ kind: "err", text: body.message ?? "Couldn't send that challenge." });
+      return;
+    }
+    setNotice({ kind: "ok", text: `Challenge sent to ${opponentUsername}.` });
+    await load();
+  };
+
+  const respondChallenge = async (challengeId: number, accept: boolean) => {
+    const res = await fetch(`/api/challenges/${challengeId}/respond`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accept }),
+    });
+    if (!res.ok) {
+      setNotice({ kind: "err", text: (await res.json()).message ?? "Couldn't respond." });
+      return;
+    }
+    await load();
+  };
+
   const joined = me?.joined === true;
   const current = data?.current ?? null;
   const showSettled = !current && data?.lastSettled ? data.lastSettled : null;
@@ -155,10 +184,13 @@ export default function ArenaPage() {
           <ArenaBoard
             info={current}
             meId={data.me?.id ?? null}
+            challenges={data.challenges}
             busy={busy}
             onEnter={() => enterArena(current.arena.id)}
             onPickLocked={load}
             onCheckResults={checkResults}
+            onSendChallenge={(username) => sendChallenge(current.arena.id, username)}
+            onRespondChallenge={respondChallenge}
           />
         ) : showSettled ? (
           <>
@@ -186,17 +218,23 @@ export default function ArenaPage() {
 function ArenaBoard({
   info,
   meId,
+  challenges,
   busy,
   onEnter,
   onPickLocked,
   onCheckResults,
+  onSendChallenge,
+  onRespondChallenge,
 }: {
   info: ArenaInfo;
   meId: number | null;
+  challenges: Challenge[];
   busy: boolean;
   onEnter: () => void;
   onPickLocked: () => void;
   onCheckResults: () => void;
+  onSendChallenge: (username: string) => Promise<void>;
+  onRespondChallenge: (challengeId: number, accept: boolean) => Promise<void>;
 }) {
   const entered = info.entry !== null;
   const anyKickedOff = info.fixtures.some((f) => Date.parse(f.commence_time) <= Date.now());
@@ -235,6 +273,14 @@ function ArenaBoard({
           </button>
         )}
       </div>
+
+      {entered && (
+        <HeadToHead
+          challenges={challenges}
+          onSendChallenge={onSendChallenge}
+          onRespondChallenge={onRespondChallenge}
+        />
+      )}
 
       {/* Slate */}
       <div className="mb-3 flex items-baseline justify-between">
@@ -275,6 +321,155 @@ function ArenaBoard({
         </>
       )}
     </>
+  );
+}
+
+/* ---------------- Head-to-head challenges ---------------- */
+
+function HeadToHead({
+  challenges,
+  onSendChallenge,
+  onRespondChallenge,
+}: {
+  challenges: Challenge[];
+  onSendChallenge: (username: string) => Promise<void>;
+  onRespondChallenge: (challengeId: number, accept: boolean) => Promise<void>;
+}) {
+  const [showForm, setShowForm] = useState(false);
+  const [opponent, setOpponent] = useState("");
+  const [sending, setSending] = useState(false);
+  const [respondingId, setRespondingId] = useState<number | null>(null);
+
+  const send = async () => {
+    if (opponent.trim().length < 3) return;
+    setSending(true);
+    await onSendChallenge(opponent.trim());
+    setSending(false);
+    setOpponent("");
+    setShowForm(false);
+  };
+
+  const respond = async (id: number, accept: boolean) => {
+    setRespondingId(id);
+    await onRespondChallenge(id, accept);
+    setRespondingId(null);
+  };
+
+  return (
+    <div className="mb-6">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="display text-lg text-white">Head-to-head</h2>
+        <button
+          onClick={() => setShowForm((v) => !v)}
+          className="btn-press rounded-xl border-b-night-950 bg-night-600 px-3 py-1.5 text-sm font-extrabold text-lilac-200 hover:bg-night-500"
+        >
+          {showForm ? "Cancel" : "⚔️ Challenge a friend"}
+        </button>
+      </div>
+
+      {showForm && (
+        <div className="pop-in mb-3 flex gap-2 rounded-2xl border-2 border-gold-600/40 bg-night-800 p-3">
+          <input
+            value={opponent}
+            onChange={(e) => setOpponent(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && send()}
+            placeholder="Their player name"
+            maxLength={16}
+            autoFocus
+            aria-label="Opponent's player name"
+            className="flex-1 rounded-xl border-2 border-white/15 bg-night-900 px-3 py-2 font-bold text-white placeholder:text-lilac-400/50 focus:border-gold-400 focus:outline-none"
+          />
+          <button
+            onClick={send}
+            disabled={sending || opponent.trim().length < 3}
+            className="btn-press shrink-0 rounded-xl border-b-gold-800 bg-gold-400 px-4 py-2 text-sm font-black text-night-950 hover:bg-gold-300 disabled:opacity-40"
+          >
+            {sending ? "…" : "Send"}
+          </button>
+        </div>
+      )}
+
+      {challenges.length > 0 && (
+        <ul className="flex flex-col gap-2">
+          {challenges.map((c) => (
+            <li
+              key={c.id}
+              className="flex items-center gap-3 rounded-2xl border-2 border-white/10 bg-night-800/80 px-3 py-2.5"
+            >
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <ManagerAvatar config={parseAvatar(c.me.avatar)} size={28} />
+                <span
+                  className={`font-mono text-sm font-bold ${
+                    c.me.points >= 0 ? "text-gold-300" : "text-danger-300"
+                  }`}
+                >
+                  {pointsLabel(c.me.points)}
+                </span>
+                <span className="display text-xs text-lilac-400/60">vs</span>
+                <span
+                  className={`font-mono text-sm font-bold ${
+                    c.opponent.points >= 0 ? "text-gold-300" : "text-danger-300"
+                  }`}
+                >
+                  {pointsLabel(c.opponent.points)}
+                </span>
+                <ManagerAvatar config={parseAvatar(c.opponent.avatar)} size={28} />
+                <span className="min-w-0 truncate text-sm font-bold text-white">
+                  {c.opponent.username}
+                </span>
+              </div>
+
+              {c.status === "pending" && !c.isMine ? (
+                <div className="flex shrink-0 gap-1.5">
+                  <button
+                    onClick={() => respond(c.id, true)}
+                    disabled={respondingId === c.id}
+                    className="btn-press rounded-lg border-b-gold-800 bg-gold-400 px-2.5 py-1 text-xs font-extrabold text-night-950 hover:bg-gold-300 disabled:opacity-40"
+                  >
+                    Accept
+                  </button>
+                  <button
+                    onClick={() => respond(c.id, false)}
+                    disabled={respondingId === c.id}
+                    className="btn-press rounded-lg border-b-night-950 bg-night-700 px-2.5 py-1 text-xs font-extrabold text-lilac-300 disabled:opacity-40"
+                  >
+                    Decline
+                  </button>
+                </div>
+              ) : (
+                <span
+                  className={`stamp shrink-0 text-[10px] ${
+                    c.status === "pending"
+                      ? "text-lilac-300"
+                      : c.status === "declined"
+                        ? "text-danger-300"
+                        : c.status === "completed"
+                          ? c.won === null
+                            ? "text-lilac-300"
+                            : c.won
+                              ? "text-turf-300"
+                              : "text-danger-300"
+                          : "text-gold-300"
+                  }`}
+                >
+                  {c.status === "pending"
+                    ? "Waiting"
+                    : c.status === "declined"
+                      ? "Declined"
+                      : c.status === "completed"
+                        ? c.won === null
+                          ? "Tied"
+                          : c.won
+                            ? "Won"
+                            : "Lost"
+                        : "In play"}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -566,6 +761,9 @@ function WorldRankings({ board }: { board: LeaderboardResponse }) {
               )}
               {p.arena_wins > 0 && (
                 <span className="ml-2 text-xs font-bold text-lilac-300">🏆 {p.arena_wins}</span>
+              )}
+              {p.challenge_wins > 0 && (
+                <span className="ml-2 text-xs font-bold text-lilac-300">⚔️ {p.challenge_wins}</span>
               )}
             </p>
             <div className="flex items-center gap-2">

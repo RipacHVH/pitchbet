@@ -8,6 +8,7 @@ import {
   type PlayerRow,
 } from "./db";
 import { rpForOdds } from "./ranks";
+import { resolveChallengesForArena } from "./challenges";
 
 const SLATE_SIZE = 5;
 
@@ -267,6 +268,7 @@ export async function settleArenaRound(
       }
       await tx.exec("UPDATE arenas SET status = 'settled', settled_at = now() WHERE id = ?", [id]);
     });
+    await resolveChallengesForArena(id);
     finalized.push(id);
   }
   return { finalized, reveal };

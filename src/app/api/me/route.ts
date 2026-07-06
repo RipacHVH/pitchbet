@@ -26,6 +26,7 @@ export async function GET() {
     rp: player.rp,
     tier: tierFor(player.rp).name,
     arenaWins: player.arena_wins,
+    challengeWins: player.challenge_wins,
     openBets: Number(openBets?.n ?? 0),
     spinAvailable: player.last_daily_at !== new Date().toISOString().slice(0, 10),
     avatar: parseAvatar(player.avatar),

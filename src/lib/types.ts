@@ -34,6 +34,7 @@ export interface Me {
   rp?: number;
   tier?: string;
   arenaWins?: number;
+  challengeWins?: number;
   openBets?: number;
   spinAvailable?: boolean;
   avatar?: import("./avatar").AvatarConfig;
@@ -86,14 +87,33 @@ export interface ArenaInfo {
   standings: ArenaStanding[];
 }
 
+export interface Challenge {
+  id: number;
+  status: "pending" | "accepted" | "declined" | "completed";
+  createdAt: string;
+  resolvedAt: string | null;
+  isMine: boolean;
+  me: { id: number; username: string; avatar: string | null; points: number };
+  opponent: { id: number; username: string; avatar: string | null; points: number };
+  won: boolean | null;
+}
+
 export interface ArenaResponse {
   current: ArenaInfo | null;
   lastSettled: ArenaInfo | null;
   me: { id: number; username: string; rp: number } | null;
+  challenges: Challenge[];
 }
 
 export interface LeaderboardResponse {
-  players: { id: number; username: string; rp: number; arena_wins: number; avatar: string | null }[];
+  players: {
+    id: number;
+    username: string;
+    rp: number;
+    arena_wins: number;
+    challenge_wins: number;
+    avatar: string | null;
+  }[];
   meId: number | null;
 }
 

@@ -9,9 +9,10 @@ export async function GET() {
     username: string;
     rp: number;
     arena_wins: number;
+    challenge_wins: number;
     avatar: string | null;
   }>(
-    `SELECT id, username, rp, arena_wins, avatar FROM players
+    `SELECT id, username, rp, arena_wins, challenge_wins, avatar FROM players
      WHERE token IS NOT NULL OR password_hash IS NOT NULL
      ORDER BY rp DESC, arena_wins DESC, created_at ASC
      LIMIT 50`,

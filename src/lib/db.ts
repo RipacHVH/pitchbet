@@ -94,13 +94,15 @@ export function ensureSchema(): Promise<void> {
         balance REAL NOT NULL DEFAULT 1000,
         rp INTEGER NOT NULL DEFAULT 0,
         arena_wins INTEGER NOT NULL DEFAULT 0,
+        challenge_wins INTEGER NOT NULL DEFAULT 0,
         last_daily_at TEXT,
         password_hash TEXT,
         avatar TEXT,
         created_at TIMESTAMPTZ NOT NULL DEFAULT now()
       );
-      -- Already-deployed databases predate the email column; add it if missing.
+      -- Already-deployed databases predate these columns; add if missing.
       ALTER TABLE players ADD COLUMN IF NOT EXISTS email TEXT UNIQUE;
+      ALTER TABLE players ADD COLUMN IF NOT EXISTS challenge_wins INTEGER NOT NULL DEFAULT 0;
 
       CREATE TABLE IF NOT EXISTS fixtures (
         id TEXT PRIMARY KEY,
@@ -170,6 +172,20 @@ export function ensureSchema(): Promise<void> {
         UNIQUE (arena_id, player_id, fixture_id)
       );
 
+      CREATE TABLE IF NOT EXISTS challenges (
+        id SERIAL PRIMARY KEY,
+        arena_id INTEGER NOT NULL REFERENCES arenas(id),
+        challenger_id INTEGER NOT NULL REFERENCES players(id),
+        opponent_id INTEGER NOT NULL REFERENCES players(id),
+        status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','accepted','declined','completed')),
+        winner_id INTEGER REFERENCES players(id),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        resolved_at TIMESTAMPTZ,
+        UNIQUE (arena_id, challenger_id, opponent_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_challenges_opponent ON challenges (opponent_id, status);
+      CREATE INDEX IF NOT EXISTS idx_challenges_challenger ON challenges (challenger_id, status);
+
       CREATE TABLE IF NOT EXISTS player_items (
         player_id INTEGER NOT NULL REFERENCES players(id),
         item_id TEXT NOT NULL,
@@ -212,6 +228,7 @@ export interface PlayerRow {
   balance: number;
   rp: number;
   arena_wins: number;
+  challenge_wins: number;
   last_daily_at: string | null;
   password_hash: string | null;
   avatar: string | null;
@@ -273,4 +290,15 @@ export interface ArenaBetRow {
   status: "open" | "won" | "lost" | "void";
   rp_delta: number | null;
   created_at: string;
+}
+
+export interface ChallengeRow {
+  id: number;
+  arena_id: number;
+  challenger_id: number;
+  opponent_id: number;
+  status: "pending" | "accepted" | "declined" | "completed";
+  winner_id: number | null;
+  created_at: string;
+  resolved_at: string | null;
 }

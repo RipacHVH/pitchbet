@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getOrCreateOpenArena, arenaPayload } from "@/lib/arena";
+import { listChallenges } from "@/lib/challenges";
 import { refreshStaleFixtures } from "@/lib/fixtures";
 import { currentPlayer } from "@/lib/identity";
 import { db, type ArenaRow } from "@/lib/db";
@@ -23,5 +24,6 @@ export async function GET() {
     lastSettled: lastSettled ? await arenaPayload(lastSettled, player) : null,
     tiers: TIERS,
     me: player ? { id: player.id, username: player.username, rp: player.rp } : null,
+    challenges: arena && player ? await listChallenges(arena.id, player.id) : [],
   });
 }

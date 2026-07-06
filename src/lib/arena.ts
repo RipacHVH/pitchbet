@@ -29,6 +29,18 @@ export interface ArenaPayload {
   standings: ArenaStanding[];
 }
 
+export interface ArenaRevealItem {
+  fixtureId: string;
+  homeTeam: string;
+  awayTeam: string;
+  homeScore: number;
+  awayScore: number;
+  selection: "home" | "draw" | "away";
+  odds: number;
+  rpDelta: number;
+  won: boolean;
+}
+
 /** The one open arena, creating it from the next upcoming matches if needed. */
 export async function getOrCreateOpenArena(): Promise<ArenaRow | null> {
   const open = await db().one<ArenaRow>("SELECT * FROM arenas WHERE status = 'open' LIMIT 1");
@@ -145,28 +157,36 @@ export async function placeArenaPick(
 /**
  * Score decided picks (right: +odds x 10 RP, wrong: same amount lost, global
  * RP floored at 0), then finalize any arena whose whole slate is resolved.
+ *
+ * Settlement is global, but callerId scopes the returned reveal list to what
+ * that specific player should see on their result-reveal screen.
  */
-export async function settleArenaRound(): Promise<{ finalized: number[] }> {
-  const decided = await db().many<ArenaBetRow & { home_score: number; away_score: number }>(
-    `SELECT ab.*, f.home_score, f.away_score FROM arena_bets ab
+export async function settleArenaRound(
+  callerId?: number,
+): Promise<{ finalized: number[]; reveal: ArenaRevealItem[] }> {
+  const decided = await db().many<
+    ArenaBetRow & Pick<FixtureRow, "home_team" | "away_team" | "home_score" | "away_score">
+  >(
+    `SELECT ab.*, f.home_team, f.away_team, f.home_score, f.away_score FROM arena_bets ab
      JOIN fixtures f ON f.id = ab.fixture_id
      WHERE ab.status = 'open' AND f.completed = 1
        AND f.home_score IS NOT NULL AND f.away_score IS NOT NULL`,
   );
 
+  const reveal: ArenaRevealItem[] = [];
+
   if (decided.length > 0) {
     await withTx(async (tx) => {
       for (const pick of decided) {
-        const winner =
-          pick.home_score > pick.away_score
-            ? "home"
-            : pick.home_score < pick.away_score
-              ? "away"
-              : "draw";
+        // WHERE clause above guarantees these are non-null.
+        const homeScore = pick.home_score!;
+        const awayScore = pick.away_score!;
+        const winner = homeScore > awayScore ? "home" : homeScore < awayScore ? "away" : "draw";
+        const won = pick.selection === winner;
         const atStake = rpForOdds(pick.odds);
-        const delta = pick.selection === winner ? atStake : -atStake;
+        const delta = won ? atStake : -atStake;
         await tx.exec("UPDATE arena_bets SET status = ?, rp_delta = ? WHERE id = ?", [
-          pick.selection === winner ? "won" : "lost",
+          won ? "won" : "lost",
           delta,
           pick.id,
         ]);
@@ -178,6 +198,19 @@ export async function settleArenaRound(): Promise<{ finalized: number[] }> {
           delta,
           pick.player_id,
         ]);
+        if (callerId !== undefined && pick.player_id === callerId) {
+          reveal.push({
+            fixtureId: pick.fixture_id,
+            homeTeam: pick.home_team,
+            awayTeam: pick.away_team,
+            homeScore,
+            awayScore,
+            selection: pick.selection,
+            odds: pick.odds,
+            rpDelta: delta,
+            won,
+          });
+        }
       }
     });
   }
@@ -236,5 +269,5 @@ export async function settleArenaRound(): Promise<{ finalized: number[] }> {
     });
     finalized.push(id);
   }
-  return { finalized };
+  return { finalized, reveal };
 }

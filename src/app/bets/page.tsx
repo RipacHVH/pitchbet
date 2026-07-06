@@ -4,8 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import { Coin, Hud } from "@/components/Hud";
 import { TeamBadge } from "@/components/TeamBadge";
 import { JoinGate } from "@/components/JoinGate";
+import { ResultReveal, type RevealItem } from "@/components/ResultReveal";
 import { useMe } from "@/lib/MeContext";
-import type { Bet } from "@/lib/types";
+import type { Bet, SettleSummary } from "@/lib/types";
 
 const STAMP: Record<Bet["status"], { label: string; cls: string }> = {
   open: { label: "In play", cls: "text-lilac-300" },
@@ -19,6 +20,7 @@ export default function TicketsPage() {
   const [bets, setBets] = useState<Bet[] | null>(null);
   const [settling, setSettling] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [reveal, setReveal] = useState<RevealItem[] | null>(null);
 
   const loadBets = useCallback(async () => {
     const res = await fetch("/api/bets");
@@ -43,12 +45,28 @@ export default function TicketsPage() {
       setNotice("Couldn't check results — try again in a moment.");
       return;
     }
-    const s = await res.json();
-    setNotice(
-      s.settled === 0 && s.voided === 0
-        ? "No final whistles yet — come back after full time."
-        : `${s.won > 0 ? `🏆 ${s.won} winner${s.won === 1 ? "" : "s"}! ` : ""}${s.settled} ticket${s.settled === 1 ? "" : "s"} settled${s.voided ? `, ${s.voided} refunded` : ""}.`,
-    );
+    const s: SettleSummary = await res.json();
+    if (s.careerReveal.length > 0) {
+      setReveal(
+        s.careerReveal.map((r) => ({
+          homeTeam: r.homeTeam,
+          awayTeam: r.awayTeam,
+          homeScore: r.homeScore,
+          awayScore: r.awayScore,
+          selection: r.selection,
+          odds: r.odds,
+          won: r.won,
+          amount: r.won ? r.payout : -r.stake,
+          unit: "coins",
+        })),
+      );
+    } else {
+      setNotice(
+        s.settled === 0 && s.voided === 0
+          ? "No final whistles yet — come back after full time."
+          : `${s.settled} ticket${s.settled === 1 ? "" : "s"} settled${s.voided ? `, ${s.voided} refunded` : ""}.`,
+      );
+    }
     await Promise.all([loadBets(), refreshMe()]);
   };
 
@@ -173,6 +191,8 @@ export default function TicketsPage() {
           </ul>
         )}
       </main>
+
+      {reveal && <ResultReveal items={reveal} onDone={() => setReveal(null)} />}
     </div>
   );
 }

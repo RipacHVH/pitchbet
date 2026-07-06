@@ -1,11 +1,24 @@
 import { db, withTx, type BetRow, type FixtureRow } from "./db";
 import { fetchScores } from "./oddsApi";
-import { settleArenaRound } from "./arena";
+import { settleArenaRound, type ArenaRevealItem } from "./arena";
 
 /** How long after kickoff we consider a match plausibly finished. */
 const MATCH_DURATION_MS = 150 * 60_000;
 /** Bets whose fixture never got a score within this window are voided (stake refunded). */
 const VOID_AFTER_MS = 4 * 24 * 60 * 60_000;
+
+export interface CareerRevealItem {
+  fixtureId: string;
+  homeTeam: string;
+  awayTeam: string;
+  homeScore: number;
+  awayScore: number;
+  selection: "home" | "draw" | "away";
+  odds: number;
+  stake: number;
+  payout: number;
+  won: boolean;
+}
 
 export interface SettleSummary {
   settled: number;
@@ -14,6 +27,9 @@ export interface SettleSummary {
   voided: number;
   arenasFinalized: number;
   scoresFetchedFor: string[];
+  /** Newly-decided outcomes belonging to the calling player, for the result-reveal screen. */
+  careerReveal: CareerRevealItem[];
+  arenaReveal: ArenaRevealItem[];
 }
 
 /**
@@ -22,8 +38,12 @@ export interface SettleSummary {
  * 2. One scores fetch per league that still has pending bets past full time
  *    (2 credits each), then settle again.
  * 3. Finalize arenas whose slate is done — ranks, RP, crowns.
+ *
+ * Settlement itself is global (everyone's outstanding bets get resolved),
+ * but callerId scopes the returned reveal list to what the requesting
+ * player should actually see on their result-reveal screen.
  */
-export async function settleEverything(): Promise<SettleSummary> {
+export async function settleEverything(callerId: number): Promise<SettleSummary> {
   const summary: SettleSummary = {
     settled: 0,
     won: 0,
@@ -31,9 +51,11 @@ export async function settleEverything(): Promise<SettleSummary> {
     voided: 0,
     arenasFinalized: 0,
     scoresFetchedFor: [],
+    careerReveal: [],
+    arenaReveal: [],
   };
 
-  await settleCareerFromDb(summary);
+  await settleCareerFromDb(summary, callerId);
 
   const pendingSports = (
     await db().many<{ sport_key: string }>(
@@ -67,18 +89,21 @@ export async function settleEverything(): Promise<SettleSummary> {
     }
   }
 
-  if (summary.scoresFetchedFor.length > 0) await settleCareerFromDb(summary);
+  if (summary.scoresFetchedFor.length > 0) await settleCareerFromDb(summary, callerId);
   await voidStaleCareerBets(summary);
 
-  const arena = await settleArenaRound();
+  const arena = await settleArenaRound(callerId);
   summary.arenasFinalized = arena.finalized.length;
+  summary.arenaReveal = arena.reveal;
 
   return summary;
 }
 
-async function settleCareerFromDb(summary: SettleSummary) {
-  const rows = await db().many<BetRow & { home_score: number; away_score: number }>(
-    `SELECT b.*, f.home_score, f.away_score FROM bets b
+async function settleCareerFromDb(summary: SettleSummary, callerId: number) {
+  const rows = await db().many<
+    BetRow & Pick<FixtureRow, "home_team" | "away_team" | "home_score" | "away_score">
+  >(
+    `SELECT b.*, f.home_team, f.away_team, f.home_score, f.away_score FROM bets b
      JOIN fixtures f ON f.id = b.fixture_id
      WHERE b.status = 'open' AND f.completed = 1
        AND f.home_score IS NOT NULL AND f.away_score IS NOT NULL`,
@@ -87,26 +112,41 @@ async function settleCareerFromDb(summary: SettleSummary) {
 
   await withTx(async (tx) => {
     for (const bet of rows) {
-      const winner =
-        bet.home_score > bet.away_score ? "home" : bet.home_score < bet.away_score ? "away" : "draw";
-      if (bet.selection === winner) {
-        const payout = Math.round(bet.stake * bet.odds * 100) / 100;
-        await tx.exec("UPDATE bets SET status = 'won', payout = ?, settled_at = now() WHERE id = ?", [
-          payout,
-          bet.id,
-        ]);
+      // WHERE clause above guarantees these are non-null.
+      const homeScore = bet.home_score!;
+      const awayScore = bet.away_score!;
+      const winner = homeScore > awayScore ? "home" : homeScore < awayScore ? "away" : "draw";
+      const won = bet.selection === winner;
+      const payout = won ? Math.round(bet.stake * bet.odds * 100) / 100 : 0;
+      await tx.exec("UPDATE bets SET status = ?, payout = ?, settled_at = now() WHERE id = ?", [
+        won ? "won" : "lost",
+        payout,
+        bet.id,
+      ]);
+      if (won) {
         await tx.exec("UPDATE players SET balance = balance + ? WHERE id = ?", [
           payout,
           bet.user_id,
         ]);
         summary.won++;
       } else {
-        await tx.exec("UPDATE bets SET status = 'lost', payout = 0, settled_at = now() WHERE id = ?", [
-          bet.id,
-        ]);
         summary.lost++;
       }
       summary.settled++;
+      if (bet.user_id === callerId) {
+        summary.careerReveal.push({
+          fixtureId: bet.fixture_id,
+          homeTeam: bet.home_team,
+          awayTeam: bet.away_team,
+          homeScore,
+          awayScore,
+          selection: bet.selection,
+          odds: bet.odds,
+          stake: bet.stake,
+          payout,
+          won,
+        });
+      }
     }
   });
 }

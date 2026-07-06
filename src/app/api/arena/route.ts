@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
-import { getOrCreateOpenArena, arenaPayload, settleArenaRound } from "@/lib/arena";
+import { getOrCreateOpenArena, arenaPayload } from "@/lib/arena";
 import { refreshStaleFixtures } from "@/lib/fixtures";
 import { currentPlayer } from "@/lib/identity";
 import { db, type ArenaRow } from "@/lib/db";
 import { TIERS } from "@/lib/ranks";
 
+// Note: arena settlement only happens via the explicit "Check results" button
+// (POST /api/arena/settle or /api/bets/settle) — never passively on page load.
+// Otherwise a player's picks could resolve silently before they ever see the
+// result-reveal screen.
 export async function GET() {
   const player = await currentPlayer();
   await refreshStaleFixtures(false);
-
-  // Free (DB-only) settle pass so finished arenas flip to podium view even
-  // if nobody pressed the settle button.
-  await settleArenaRound();
 
   const arena = await getOrCreateOpenArena();
   const lastSettled = await db().one<ArenaRow>(

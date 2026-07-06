@@ -7,6 +7,7 @@ import { Countdown } from "@/components/Countdown";
 import { JoinGate } from "@/components/JoinGate";
 import { RankBadge } from "@/components/RankBadge";
 import { ManagerAvatar } from "@/components/ManagerAvatar";
+import { ResultReveal, type RevealItem } from "@/components/ResultReveal";
 import { parseAvatar } from "@/lib/avatar";
 import { useMe } from "@/lib/MeContext";
 import type {
@@ -17,6 +18,7 @@ import type {
   Fixture,
   LeaderboardResponse,
   Selection,
+  SettleSummary,
 } from "@/lib/types";
 
 function rpForOdds(odds: number): number {
@@ -33,6 +35,7 @@ export default function ArenaPage() {
   const [board, setBoard] = useState<LeaderboardResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const [reveal, setReveal] = useState<RevealItem[] | null>(null);
 
   const load = useCallback(async () => {
     const [arenaRes, boardRes] = await Promise.all([
@@ -81,14 +84,30 @@ export default function ArenaPage() {
       setNotice({ kind: "err", text: "Couldn't check results — try again in a moment." });
       return;
     }
-    const s = await res.json();
-    setNotice({
-      kind: "ok",
-      text:
-        s.arenasFinalized > 0
-          ? "🏁 Full time! The table is final — rank points are in the books."
-          : "The table updates as matches finish. No new final whistles yet.",
-    });
+    const s: SettleSummary = await res.json();
+    if (s.arenaReveal.length > 0) {
+      setReveal(
+        s.arenaReveal.map((r) => ({
+          homeTeam: r.homeTeam,
+          awayTeam: r.awayTeam,
+          homeScore: r.homeScore,
+          awayScore: r.awayScore,
+          selection: r.selection,
+          odds: r.odds,
+          won: r.won,
+          amount: r.rpDelta,
+          unit: "RP",
+        })),
+      );
+    } else {
+      setNotice({
+        kind: "ok",
+        text:
+          s.arenasFinalized > 0
+            ? "🏁 Full time! The table is final — rank points are in the books."
+            : "The table updates as matches finish. No new final whistles yet.",
+      });
+    }
     await Promise.all([load(), refreshMe()]);
   };
 
@@ -156,6 +175,8 @@ export default function ArenaPage() {
 
         {board && board.players.length > 0 && <WorldRankings board={board} />}
       </main>
+
+      {reveal && <ResultReveal items={reveal} onDone={() => setReveal(null)} />}
     </div>
   );
 }

@@ -96,3 +96,40 @@ export interface LeaderboardResponse {
   players: { id: number; username: string; rp: number; arena_wins: number; avatar: string | null }[];
   meId: number | null;
 }
+
+export interface CareerRevealItem {
+  fixtureId: string;
+  homeTeam: string;
+  awayTeam: string;
+  homeScore: number;
+  awayScore: number;
+  selection: Selection;
+  odds: number;
+  stake: number;
+  payout: number;
+  won: boolean;
+}
+
+export interface ArenaRevealItem {
+  fixtureId: string;
+  homeTeam: string;
+  awayTeam: string;
+  homeScore: number;
+  awayScore: number;
+  selection: Selection;
+  odds: number;
+  rpDelta: number;
+  won: boolean;
+}
+
+export interface SettleSummary {
+  settled: number;
+  won: number;
+  lost: number;
+  voided: number;
+  arenasFinalized: number;
+  scoresFetchedFor: string[];
+  careerReveal: CareerRevealItem[];
+  arenaReveal: ArenaRevealItem[];
+  newBalance?: number;
+}

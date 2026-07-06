@@ -233,52 +233,64 @@ export function ManagerAvatar({ config, size = 40 }: { config: AvatarConfig; siz
         <ellipse cx="23.2" cy="31.4" rx="2" ry="1.25" fill="#ff6f61" opacity="0.3" />
         <ellipse cx="40.8" cy="31.4" rx="2" ry="1.25" fill="#ff6f61" opacity="0.3" />
 
-        {/* hair styles: 0 bald, 1 short, 2 spiky, 3 curly, 4 long */}
+        {/*
+          Hair styles: 0 bald, 1 short, 2 spiky, 3 curly, 4 long.
+          Styles 1-3 share one base "cap" silhouette (CAP below) that runs
+          from the crown down past the temple to just over the top of each
+          ear (slightly overlapping the ear circles, never stopping short of
+          them) so there's never a sliver of bald skin at the hairline or a
+          gap where the ear meets the hair. Per-style texture is layered on
+          top of, and overlapping into, that same solid shape.
+        */}
         {config.hair === 1 && (
           <g fill={url("hairg")}>
-            <path d="M19 27 Q20 15.4 32 15 Q44 15.4 45 27 Q44 20.3 32 19.6 Q20 20.3 19 27 Z" />
-            {/* single smooth side-swept fringe */}
-            <path d="M20.8 22 Q28 24.6 36 20.6 Q28 19.2 20.8 22 Z" />
-            <path d="M23 18.4 Q27 16.2 31 16.2" stroke={shade(hairC, 0.4)} strokeWidth="0.9" fill="none" opacity="0.6" strokeLinecap="round" />
+            <path d="M18.2 26.6 Q17.6 15.1 32 14.6 Q46.4 15.1 45.8 26.6 Q45 20.6 32 19.8 Q19 20.6 18.2 26.6 Z" />
+            {/* single smooth side-swept fringe, overlapping up into the cap */}
+            <path d="M19.6 21.6 Q28 26 44 21.1 Q28 19.4 19.6 21.6 Z" />
+            <path d="M23 18 Q27 16 31 16.2" stroke={shade(hairC, 0.4)} strokeWidth="0.9" fill="none" opacity="0.6" strokeLinecap="round" />
           </g>
         )}
         {config.hair === 2 && (
           <g fill={url("hairg")}>
-            {/* base band */}
-            <path d="M19 26.5 Q20 16.5 32 16 Q44 16.5 45 26.5 Q44 20.6 32 20 Q20 20.6 19 26.5 Z" />
-            {/* chunky swept spikes with rounded tips */}
-            <path d="M20.2 21.5 Q19.2 14.6 24.8 17.4 Q22.2 18.6 20.2 21.5 Z" />
-            <path d="M24.8 18.4 Q25.8 10.8 30.6 16.2 Q27.4 16.4 24.8 18.4 Z" />
-            <path d="M31.4 16 Q34 9.4 37.6 16.4 Q34.4 15.4 31.4 16 Z" />
-            <path d="M38.2 17 Q42.6 11.6 43.8 18.8 Q41 17.2 38.2 17 Z" />
-            <path d="M43 20.6 Q46.6 17.4 45.4 24 Q44.4 22 43 20.6 Z" />
+            <path d="M18.2 26.6 Q17.6 15.1 32 14.6 Q46.4 15.1 45.8 26.6 Q45 20.6 32 19.8 Q19 20.6 18.2 26.6 Z" />
+            {/* chunky spikes rooted well inside the cap so they read as one mass */}
+            <path d="M19.4 20.5 Q17.6 12 23.4 16.7 Q21 17.9 19.4 20.5 Z" />
+            <path d="M23.6 17.7 Q24.9 9.3 30 15.6 Q26.7 15.9 23.6 17.7 Z" />
+            <path d="M29 15.6 Q31.6 7.2 36 15.4 Q32.6 15.7 29 15.6 Z" />
+            <path d="M35.3 15.7 Q40.3 8.8 41.7 17.3 Q38.4 15.9 35.3 15.7 Z" />
+            <path d="M41 18.2 Q46.4 13.2 44.8 21 Q42.7 19.4 41 18.2 Z" />
           </g>
         )}
         {config.hair === 3 && (
           <g fill={url("hairg")}>
-            <circle cx="23" cy="20" r="4.5" />
-            <circle cx="30" cy="16.5" r="4.5" />
-            <circle cx="38" cy="17.5" r="4.5" />
-            <circle cx="43" cy="23" r="4" />
-            <circle cx="20" cy="25" r="3.5" />
-            {/* forehead puffs */}
-            <circle cx="26.5" cy="20.3" r="2.9" />
-            <circle cx="33.8" cy="19.8" r="3.1" />
-            <circle cx="40" cy="20.6" r="2.6" />
-            <circle cx="28.6" cy="15.2" r="1.1" fill={shade(hairC, 0.4)} opacity="0.8" />
-            <circle cx="25.4" cy="19.2" r="0.9" fill={shade(hairC, 0.4)} opacity="0.7" />
-            <circle cx="36.7" cy="16.4" r="0.9" fill={shade(hairC, 0.4)} opacity="0.7" />
+            <path d="M18.2 26.6 Q17.6 15.1 32 14.6 Q46.4 15.1 45.8 26.6 Q45 20.6 32 19.8 Q19 20.6 18.2 26.6 Z" />
+            {/* puffs generously overlapping the cap and each other, including over the temples */}
+            <circle cx="19.8" cy="23.2" r="3.9" />
+            <circle cx="23" cy="18.3" r="4.6" />
+            <circle cx="30" cy="15.6" r="4.6" />
+            <circle cx="38" cy="16.4" r="4.6" />
+            <circle cx="44.2" cy="23.2" r="3.9" />
+            {/* forehead puffs sit lower, over the fringe line */}
+            <circle cx="26.3" cy="19.8" r="3.1" />
+            <circle cx="33.8" cy="19.3" r="3.3" />
+            <circle cx="40.2" cy="20.3" r="2.8" />
+            <circle cx="28.6" cy="14.6" r="1.1" fill={shade(hairC, 0.4)} opacity="0.8" />
+            <circle cx="22.4" cy="18.2" r="0.9" fill={shade(hairC, 0.4)} opacity="0.7" />
+            <circle cx="36.7" cy="15.6" r="0.9" fill={shade(hairC, 0.4)} opacity="0.7" />
           </g>
         )}
         {config.hair === 4 && (
           <g fill={url("hairg")}>
-            {/* long sides, wide enough to drape over the ears */}
-            <path d="M17 42 Q14.5 16 32 15 Q49.5 16 47 42 L40.5 42 Q43.5 24 32 21 Q20.5 24 23.5 42 Z" />
+            {/* crown cap, blending into the long side flaps below */}
+            <path d="M18 25 Q17 14.6 32 14.2 Q47 14.6 46 25 Q44.5 19.6 32 19 Q19.5 19.6 18 25 Z" />
+            {/* long sides: wide and low enough to fully wrap the ears to the jaw */}
+            <path d="M16.3 23.5 Q14.6 34 17.8 43.5 L24.5 43.5 Q21.6 32 25 21.5 Q20 21.8 16.3 23.5 Z" />
+            <path d="M47.7 23.5 Q49.4 34 46.2 43.5 L39.5 43.5 Q42.4 32 39 21.5 Q44 21.8 47.7 23.5 Z" />
             {/* centre-parted curtains */}
-            <path d="M31.6 16.4 Q25 17.8 23.6 24.6 Q27.6 21 31.6 20.8 Z" />
-            <path d="M32.4 16.4 Q39 17.8 40.4 24.6 Q36.4 21 32.4 20.8 Z" />
-            <path d="M19.6 32 Q18.6 22 24.4 18.4" stroke={shade(hairC, 0.35)} strokeWidth="0.9" fill="none" opacity="0.7" strokeLinecap="round" />
-            <path d="M44.6 31 Q45.2 23 39.8 18.8" stroke={shade(hairC, 0.35)} strokeWidth="0.8" fill="none" opacity="0.6" strokeLinecap="round" />
+            <path d="M31.6 15.8 Q25 17.4 23.4 24.6 Q27.6 20.6 31.6 20.2 Z" />
+            <path d="M32.4 15.8 Q39 17.4 40.6 24.6 Q36.4 20.6 32.4 20.2 Z" />
+            <path d="M19 30 Q17.7 21 24 18" stroke={shade(hairC, 0.35)} strokeWidth="0.9" fill="none" opacity="0.7" strokeLinecap="round" />
+            <path d="M45 29 Q46.3 21 40 18.4" stroke={shade(hairC, 0.35)} strokeWidth="0.8" fill="none" opacity="0.6" strokeLinecap="round" />
           </g>
         )}
 

@@ -17,6 +17,7 @@ import type {
   ArenaStanding,
   Challenge,
   Fixture,
+  HallOfFameSeason,
   LeaderboardResponse,
   MyArenaSummary,
   Selection,
@@ -36,6 +37,7 @@ export default function ArenaPage() {
   const { me, loaded: meLoaded, refresh: refreshMe } = useMe();
   const [data, setData] = useState<ArenaResponse | null>(null);
   const [board, setBoard] = useState<LeaderboardResponse | null>(null);
+  const [hallOfFame, setHallOfFame] = useState<HallOfFameSeason[]>([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [reveal, setReveal] = useState<RevealItem[] | null>(null);
@@ -46,12 +48,14 @@ export default function ArenaPage() {
   const [freshInviteCode, setFreshInviteCode] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const [arenaRes, boardRes] = await Promise.all([
+    const [arenaRes, boardRes, hofRes] = await Promise.all([
       fetch("/api/arena"),
       fetch("/api/leaderboard"),
+      fetch("/api/seasons/hall-of-fame"),
     ]);
     if (arenaRes.ok) setData(await arenaRes.json());
     if (boardRes.ok) setBoard(await boardRes.json());
+    if (hofRes.ok) setHallOfFame((await hofRes.json()).seasons);
   }, []);
 
   const loadViewedArena = useCallback(async (id: number) => {
@@ -298,6 +302,7 @@ export default function ArenaPage() {
         )}
 
         {board && board.players.length > 0 && <WorldRankings board={board} />}
+        <HallOfFame seasons={hallOfFame} />
       </main>
 
       {reveal && <ResultReveal items={reveal} onDone={() => setReveal(null)} />}
@@ -1008,7 +1013,12 @@ function SettledArena({ info, meId }: { info: ArenaInfo; meId: number | null }) 
 function WorldRankings({ board }: { board: LeaderboardResponse }) {
   return (
     <section className="mt-10">
-      <h2 className="display mb-3 text-lg text-white">World rankings</h2>
+      <div className="mb-3 flex items-baseline justify-between">
+        <h2 className="display text-lg text-white">World rankings</h2>
+        <p className="text-[11px] font-bold text-lilac-400">
+          {board.season.name} · <Countdown iso={board.season.endsAt} prefix="ends in" />
+        </p>
+      </div>
       <ul className="flex flex-col gap-1.5">
         {board.players.map((p, i) => (
           <li
@@ -1030,12 +1040,50 @@ function WorldRankings({ board }: { board: LeaderboardResponse }) {
               {p.challenge_wins > 0 && (
                 <span className="ml-2 text-xs font-bold text-lilac-300">⚔️ {p.challenge_wins}</span>
               )}
+              {p.season_wins > 0 && (
+                <span className="ml-2 text-xs font-bold text-lilac-300">🎖️ {p.season_wins}</span>
+              )}
             </p>
             <div className="flex items-center gap-2">
               <RankBadge rp={p.rp} />
               <span className="w-14 text-right font-mono text-sm font-bold text-lilac-200">
                 {p.rp} RP
               </span>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/* ---------------- Hall of fame: past seasons ---------------- */
+
+const MEDAL = ["🥇", "🥈", "🥉"];
+
+function HallOfFame({ seasons }: { seasons: HallOfFameSeason[] }) {
+  if (seasons.length === 0) return null;
+  return (
+    <section className="mt-10">
+      <h2 className="display mb-3 text-lg text-white">Hall of fame</h2>
+      <ul className="flex flex-col gap-2">
+        {seasons.map((s) => (
+          <li
+            key={s.id}
+            className="rounded-2xl border-2 border-white/10 bg-night-800/80 px-4 py-3"
+          >
+            <p className="mb-1.5 text-xs font-extrabold uppercase tracking-widest text-lilac-400">
+              {s.name}
+            </p>
+            <div className="flex flex-col gap-1">
+              {s.top.map((t) => (
+                <p key={t.finalRank} className="flex items-center gap-2 text-sm font-bold text-white">
+                  <span>{MEDAL[t.finalRank - 1] ?? "🎖️"}</span>
+                  <span className="min-w-0 flex-1 truncate">{t.username}</span>
+                  <span className="font-mono text-gold-300">{t.finalRp} RP</span>
+                  <span className="text-[10px] font-bold text-lilac-400">{t.tier}</span>
+                </p>
+              ))}
             </div>
           </li>
         ))}

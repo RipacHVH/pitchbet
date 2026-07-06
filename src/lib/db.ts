@@ -103,6 +103,7 @@ export function ensureSchema(): Promise<void> {
       -- Already-deployed databases predate these columns; add if missing.
       ALTER TABLE players ADD COLUMN IF NOT EXISTS email TEXT UNIQUE;
       ALTER TABLE players ADD COLUMN IF NOT EXISTS challenge_wins INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE players ADD COLUMN IF NOT EXISTS season_wins INTEGER NOT NULL DEFAULT 0;
 
       CREATE TABLE IF NOT EXISTS fixtures (
         id TEXT PRIMARY KEY,
@@ -204,6 +205,26 @@ export function ensureSchema(): Promise<void> {
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS seasons (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        starts_at TIMESTAMPTZ NOT NULL,
+        ends_at TIMESTAMPTZ NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','archived')),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+
+      CREATE TABLE IF NOT EXISTS season_results (
+        season_id INTEGER NOT NULL REFERENCES seasons(id),
+        player_id INTEGER NOT NULL REFERENCES players(id),
+        username TEXT NOT NULL,
+        final_rp INTEGER NOT NULL,
+        final_rank INTEGER NOT NULL,
+        tier TEXT NOT NULL,
+        PRIMARY KEY (season_id, player_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_season_results_rank ON season_results (season_id, final_rank);
     `,
       )
       .then(() => {
@@ -236,6 +257,7 @@ export interface PlayerRow {
   rp: number;
   arena_wins: number;
   challenge_wins: number;
+  season_wins: number;
   last_daily_at: string | null;
   password_hash: string | null;
   avatar: string | null;
@@ -311,4 +333,22 @@ export interface ChallengeRow {
   winner_id: number | null;
   created_at: string;
   resolved_at: string | null;
+}
+
+export interface SeasonRow {
+  id: number;
+  name: string;
+  starts_at: string;
+  ends_at: string;
+  status: "active" | "archived";
+  created_at: string;
+}
+
+export interface SeasonResultRow {
+  season_id: number;
+  player_id: number;
+  username: string;
+  final_rp: number;
+  final_rank: number;
+  tier: string;
 }

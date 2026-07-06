@@ -127,6 +127,12 @@ export interface SingleArenaResponse {
   challenges: Challenge[];
 }
 
+export interface Season {
+  id: number;
+  name: string;
+  endsAt: string;
+}
+
 export interface LeaderboardResponse {
   players: {
     id: number;
@@ -134,9 +140,22 @@ export interface LeaderboardResponse {
     rp: number;
     arena_wins: number;
     challenge_wins: number;
+    season_wins: number;
     avatar: string | null;
   }[];
   meId: number | null;
+  season: Season;
+}
+
+export interface HallOfFameSeason {
+  id: number;
+  name: string;
+  endsAt: string;
+  top: { username: string; finalRp: number; finalRank: number; tier: string }[];
+}
+
+export interface HallOfFameResponse {
+  seasons: HallOfFameSeason[];
 }
 
 export interface CareerRevealItem {

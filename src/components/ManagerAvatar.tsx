@@ -1,10 +1,11 @@
+import { useId } from "react";
 import { BASIC_KITS, HAIR_COLORS, SKIN_TONES, type AvatarConfig } from "@/lib/avatar";
 
 const KIT_COLORS: Record<string, string> = {
-  "kit-keeper": "#7CFC5A",
+  "kit-keeper": "#5ee43e",
   "kit-pinstripe": "#23233c",
   "kit-hoops": "#2e7d46",
-  "kit-camo": "#3a4a3a",
+  "kit-camo": "#4a5741",
   "kit-gold": "#ffc93c",
 };
 
@@ -13,11 +14,28 @@ function kitColor(kit: string): string {
   return KIT_COLORS[kit] ?? BASIC_KITS[0];
 }
 
+/** Mix a hex color toward white (amt > 0) or black (amt < 0). */
+function shade(hex: string, amt: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  const mix = (c: number) =>
+    Math.round(amt >= 0 ? c + (255 - c) * amt : c * (1 + amt))
+      .toString(16)
+      .padStart(2, "0");
+  return `#${mix((n >> 16) & 255)}${mix((n >> 8) & 255)}${mix(n & 255)}`;
+}
+
+const SHIRT = "M12 64 Q12 44 32 44 Q52 44 52 64 Z";
+
 /**
  * The manager, as a bust in a circle. Pure SVG so it renders identically
- * everywhere: HUD, tables, shop previews.
+ * everywhere: HUD, tables, shop previews. All gradient/clip ids are scoped
+ * per instance (useId) because dozens of these render on one page.
  */
 export function ManagerAvatar({ config, size = 40 }: { config: AvatarConfig; size?: number }) {
+  const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
+  const id = (name: string) => `av${uid}${name}`;
+  const url = (name: string) => `url(#${id(name)})`;
+
   const skin = SKIN_TONES[config.skin % SKIN_TONES.length];
   const hairC = HAIR_COLORS[config.hairColor % HAIR_COLORS.length];
   const kit = kitColor(config.kit);
@@ -32,132 +50,331 @@ export function ManagerAvatar({ config, size = 40 }: { config: AvatarConfig; siz
       style={{ background: "radial-gradient(circle at 35% 25%, #41318c, #1d1347 75%)" }}
     >
       <defs>
-        <clipPath id="pbAvatarClip">
+        <clipPath id={id("clip")}>
           <circle cx="32" cy="32" r="32" />
         </clipPath>
+        {/* skin with soft top-left light */}
+        <radialGradient id={id("skin")} cx="0.38" cy="0.28" r="1">
+          <stop offset="0" stopColor={shade(skin, 0.22)} />
+          <stop offset="0.55" stopColor={skin} />
+          <stop offset="1" stopColor={shade(skin, -0.18)} />
+        </radialGradient>
+        {/* generic fabric rounding overlay for any shirt colour */}
+        <linearGradient id={id("cloth")} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#ffffff" stopOpacity="0.22" />
+          <stop offset="0.35" stopColor="#ffffff" stopOpacity="0.05" />
+          <stop offset="1" stopColor="#000000" stopOpacity="0.28" />
+        </linearGradient>
+        {/* diagonal specular sweep (gold kit, metals) */}
+        <linearGradient id={id("sheen")} x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0.32" stopColor="#ffffff" stopOpacity="0" />
+          <stop offset="0.48" stopColor="#ffffff" stopOpacity="0.55" />
+          <stop offset="0.56" stopColor="#ffffff" stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id={id("gold")} x1="0" y1="0" x2="0.9" y2="1">
+          <stop offset="0" stopColor="#fff3b8" />
+          <stop offset="0.45" stopColor="#ffc93c" />
+          <stop offset="1" stopColor="#c8860a" />
+        </linearGradient>
+        <linearGradient id={id("metal")} x1="0" y1="0" x2="0.7" y2="1">
+          <stop offset="0" stopColor="#f2f6fa" />
+          <stop offset="0.5" stopColor="#a6b0bc" />
+          <stop offset="1" stopColor="#646d78" />
+        </linearGradient>
+        <linearGradient id={id("bone")} x1="0" y1="1" x2="0.6" y2="0">
+          <stop offset="0" stopColor="#c4b28c" />
+          <stop offset="0.5" stopColor="#eee3cb" />
+          <stop offset="1" stopColor="#fbf5e6" />
+        </linearGradient>
+        <linearGradient id={id("lens")} x1="0" y1="0" x2="0.4" y2="1">
+          <stop offset="0" stopColor="#9fd9ff" />
+          <stop offset="0.45" stopColor="#2e5aa8" />
+          <stop offset="1" stopColor="#131b3a" />
+        </linearGradient>
+        <linearGradient id={id("scarf")} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#e85d51" />
+          <stop offset="1" stopColor="#9c221e" />
+        </linearGradient>
+        <radialGradient id={id("pearl")} cx="0.35" cy="0.3" r="1">
+          <stop offset="0" stopColor="#ffffff" />
+          <stop offset="0.6" stopColor="#e6e9f5" />
+          <stop offset="1" stopColor="#aab1cf" />
+        </radialGradient>
+        <linearGradient id={id("cap")} x1="0" y1="0" x2="0.4" y2="1">
+          <stop offset="0" stopColor="#5a82e0" />
+          <stop offset="1" stopColor="#22407e" />
+        </linearGradient>
+        <linearGradient id={id("canvas")} x1="0" y1="0" x2="0.3" y2="1">
+          <stop offset="0" stopColor="#e3d4ae" />
+          <stop offset="1" stopColor="#a8926a" />
+        </linearGradient>
+        <linearGradient id={id("kitbase")} x1="0" y1="0" x2="0.25" y2="1">
+          <stop offset="0" stopColor={shade(kit, 0.18)} />
+          <stop offset="0.5" stopColor={kit} />
+          <stop offset="1" stopColor={shade(kit, -0.28)} />
+        </linearGradient>
+        <linearGradient id={id("hairg")} x1="0" y1="0" x2="0.3" y2="1">
+          <stop offset="0" stopColor={shade(hairC, 0.25)} />
+          <stop offset="0.55" stopColor={hairC} />
+          <stop offset="1" stopColor={shade(hairC, -0.25)} />
+        </linearGradient>
       </defs>
-      <g clipPath="url(#pbAvatarClip)">
-        {/* shirt */}
-        <path d="M12 64 Q12 44 32 44 Q52 44 52 64 Z" fill={kit} />
+
+      <g clipPath={url("clip")}>
+        {/* ---------------- shirt ---------------- */}
+        <path d={SHIRT} fill={url("kitbase")} />
+
+        {config.kit === "kit-keeper" && (
+          <g>
+            {/* keeper chevrons */}
+            <path d="M12 57 L32 50.5 L52 57 L52 60.4 L32 54 L12 60.4 Z" fill="#1d4d12" opacity="0.85" />
+            <path d="M12 63 L32 56.5 L52 63 L52 64 L12 64 Z" fill="#1d4d12" opacity="0.6" />
+            <path d="M12 55.9 L32 49.4 L52 55.9" stroke="#d9ffc8" strokeWidth="0.7" fill="none" opacity="0.7" />
+          </g>
+        )}
         {config.kit === "kit-pinstripe" && (
-          <g stroke="#8d80c4" strokeWidth="1">
-            <line x1="24" y1="46" x2="22" y2="64" />
-            <line x1="32" y1="45" x2="32" y2="64" />
-            <line x1="40" y1="46" x2="42" y2="64" />
+          <g stroke="#aeb6dd" strokeWidth="0.55" opacity="0.75">
+            <line x1="18.5" y1="47.8" x2="16" y2="64" />
+            <line x1="23" y1="45.9" x2="21.4" y2="64" />
+            <line x1="27.5" y1="44.6" x2="26.8" y2="64" />
+            <line x1="32" y1="44.2" x2="32" y2="64" />
+            <line x1="36.5" y1="44.6" x2="37.2" y2="64" />
+            <line x1="41" y1="45.9" x2="42.6" y2="64" />
+            <line x1="45.5" y1="47.8" x2="48" y2="64" />
           </g>
         )}
         {config.kit === "kit-hoops" && (
-          <g fill="#e8e8ee">
-            <path d="M13 52 Q32 46 51 52 L51 56 Q32 50 13 56 Z" />
-            <path d="M12 60 Q32 54 52 60 L52 64 Q32 58 12 64 Z" />
+          <g>
+            <path d="M12.6 51.5 Q32 45.5 51.4 51.5 L51.4 56 Q32 50 12.6 56 Z" fill="#f2f2f6" />
+            <path d="M12.6 56 Q32 50 51.4 56" stroke="#1d4d2e" strokeWidth="0.6" fill="none" opacity="0.5" />
+            <path d="M12 60.5 Q32 54.5 52 60.5 L52 64 L12 64 Z" fill="#f2f2f6" />
+            <path d="M12 64 Q32 58.6 52 64" stroke="#1d4d2e" strokeWidth="0.6" fill="none" opacity="0.35" />
           </g>
         )}
         {config.kit === "kit-camo" && (
-          <g fill="#22301f" opacity="0.8">
-            <ellipse cx="22" cy="52" rx="5" ry="3" />
-            <ellipse cx="38" cy="58" rx="6" ry="3.5" />
-            <ellipse cx="44" cy="49" rx="4" ry="2.5" />
+          <g>
+            <g fill="#2b3524" opacity="0.9">
+              <path d="M17 51 Q21 47.5 25 50 Q26.5 53 22.5 54.5 Q17.5 55 17 51 Z" />
+              <path d="M34 56.5 Q39.5 54 43.5 57 Q44.5 60.5 39.5 61.5 Q34 61 34 56.5 Z" />
+              <path d="M42 46.5 Q46.5 45.5 48.5 48 Q48 51 44 51 Q41 49.5 42 46.5 Z" />
+            </g>
+            <g fill="#8c9469" opacity="0.85">
+              <path d="M25 58 Q29.5 56 32.5 58.5 Q32 61.5 27.5 61.5 Q24.5 60.5 25 58 Z" />
+              <path d="M15 59.5 Q18 58 20 60 Q19.5 62.5 16.5 62.5 Q14.5 61.5 15 59.5 Z" />
+              <path d="M37 48 Q40 46.5 42 48.5 Q41.5 51 38.5 50.7 Q36.5 49.8 37 48 Z" />
+            </g>
+            <g fill="#1c2417" opacity="0.6">
+              <circle cx="29" cy="52" r="1" />
+              <circle cx="46" cy="60" r="1.2" />
+              <circle cx="20" cy="56.5" r="0.9" />
+            </g>
           </g>
         )}
         {config.kit === "kit-gold" && (
-          <path d="M12 64 Q12 44 32 44 Q52 44 52 64 Z" fill="url(#pbGoldGrad)" />
+          <g>
+            <path d={SHIRT} fill={url("gold")} />
+            <path d={SHIRT} fill={url("sheen")} opacity="0.5" />
+            {/* embossed chest star */}
+            <path
+              d="M24.5 51.2 L25.6 53.4 L28 53.7 L26.2 55.4 L26.7 57.8 L24.5 56.6 L22.3 57.8 L22.8 55.4 L21 53.7 L23.4 53.4 Z"
+              fill="#a06e08"
+            />
+            <path
+              d="M24.2 50.8 L25.3 53 L27.7 53.3 L25.9 55 L26.4 57.4 L24.2 56.2 L22 57.4 L22.5 55 L20.7 53.3 L23.1 53 Z"
+              fill="#ffe9a3"
+              opacity="0.9"
+            />
+          </g>
         )}
-        <defs>
-          <linearGradient id="pbGoldGrad" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stopColor="#ffe9a3" />
-            <stop offset="0.6" stopColor="#ffc93c" />
-            <stop offset="1" stopColor="#d99a14" />
-          </linearGradient>
-        </defs>
 
-        {/* collar */}
-        <path d="M26 45 L32 50 L38 45 L38 48 L32 53 L26 48 Z" fill="rgba(0,0,0,.25)" />
+        {/* fabric rounding + sleeve seams on every kit */}
+        <path d={SHIRT} fill={url("cloth")} />
+        <path d="M18.5 47.5 Q17 54 17.3 64" stroke="#000" strokeWidth="0.8" opacity="0.18" fill="none" />
+        <path d="M45.5 47.5 Q47 54 46.7 64" stroke="#000" strokeWidth="0.8" opacity="0.18" fill="none" />
 
-        {/* head */}
-        <circle cx="32" cy="28" r="13" fill={skin} />
-        {/* ears */}
-        <circle cx="19.5" cy="28" r="2.5" fill={skin} />
-        <circle cx="44.5" cy="28" r="2.5" fill={skin} />
+        {/* collar: shaded V with a lit rim */}
+        <path d="M26 45 L32 50.5 L38 45 L38 48 L32 53.2 L26 48 Z" fill="rgba(0,0,0,.32)" />
+        <path d="M26.3 45.2 L32 50.2 L37.7 45.2" stroke="#ffffff" strokeWidth="0.8" fill="none" opacity="0.35" />
+
+        {/* ---------------- head ---------------- */}
+        <circle cx="19.5" cy="28" r="2.5" fill={url("skin")} />
+        <circle cx="44.5" cy="28" r="2.5" fill={url("skin")} />
+        <circle cx="32" cy="28" r="13" fill={url("skin")} />
+        {/* soft jaw shadow above the collar */}
+        <path d="M23 37 Q32 43.5 41 37 Q37 41 32 41 Q27 41 23 37 Z" fill="#000" opacity="0.10" />
 
         {/* hair styles: 0 bald, 1 short, 2 spiky, 3 curly, 4 long */}
         {config.hair === 1 && (
-          <path d="M19 27 Q20 15 32 15 Q44 15 45 27 Q44 20 32 19 Q20 20 19 27 Z" fill={hairC} />
+          <g>
+            <path d="M19 27 Q20 15 32 15 Q44 15 45 27 Q44 20 32 19 Q20 20 19 27 Z" fill={url("hairg")} />
+            <path d="M23 18.5 Q27 16 31 16" stroke={shade(hairC, 0.4)} strokeWidth="0.9" fill="none" opacity="0.7" strokeLinecap="round" />
+          </g>
         )}
         {config.hair === 2 && (
-          <path d="M19 26 L22 17 L25 22 L28 14 L32 20 L36 14 L39 22 L42 17 L45 26 Q40 17 32 17 Q24 17 19 26 Z" fill={hairC} />
+          <g>
+            <path d="M19 26 L22 17 L25 22 L28 14 L32 20 L36 14 L39 22 L42 17 L45 26 Q40 17 32 17 Q24 17 19 26 Z" fill={url("hairg")} />
+            <path d="M27.6 15.5 L28 14.6" stroke={shade(hairC, 0.45)} strokeWidth="1" strokeLinecap="round" opacity="0.8" />
+          </g>
         )}
         {config.hair === 3 && (
-          <g fill={hairC}>
+          <g fill={url("hairg")}>
             <circle cx="23" cy="20" r="4.5" />
             <circle cx="30" cy="16.5" r="4.5" />
             <circle cx="38" cy="17.5" r="4.5" />
             <circle cx="43" cy="23" r="4" />
             <circle cx="20" cy="25" r="3.5" />
+            <circle cx="28.6" cy="15.2" r="1.1" fill={shade(hairC, 0.4)} opacity="0.8" />
+            <circle cx="22" cy="18.8" r="0.9" fill={shade(hairC, 0.4)} opacity="0.7" />
           </g>
         )}
         {config.hair === 4 && (
-          <path d="M18 40 Q16 16 32 15 Q48 16 46 40 L42 40 Q44 22 32 20 Q20 22 22 40 Z" fill={hairC} />
+          <g>
+            <path d="M18 40 Q16 16 32 15 Q48 16 46 40 L42 40 Q44 22 32 20 Q20 22 22 40 Z" fill={url("hairg")} />
+            <path d="M20.5 30 Q19.8 22 25 18.5" stroke={shade(hairC, 0.35)} strokeWidth="0.9" fill="none" opacity="0.7" strokeLinecap="round" />
+          </g>
         )}
 
         {/* face */}
         <circle cx="27" cy="27.5" r="1.6" fill="#241a2e" />
         <circle cx="37" cy="27.5" r="1.6" fill="#241a2e" />
+        <circle cx="27.5" cy="27" r="0.5" fill="#fff" opacity="0.85" />
+        <circle cx="37.5" cy="27" r="0.5" fill="#fff" opacity="0.85" />
         <path d="M27.5 34 Q32 37.5 36.5 34" stroke="#241a2e" strokeWidth="1.6" fill="none" strokeLinecap="round" />
 
-        {/* extras */}
+        {/* ---------------- extras ---------------- */}
         {config.extra === "extra-shades" && (
           <g>
-            <rect x="22" y="24.5" width="8.5" height="5.5" rx="2" fill="#16121f" />
-            <rect x="33.5" y="24.5" width="8.5" height="5.5" rx="2" fill="#16121f" />
-            <line x1="30.5" y1="27" x2="33.5" y2="27" stroke="#16121f" strokeWidth="1.5" />
+            {/* gold frame: top bar + bridge + temples to the ears */}
+            <path d="M20.5 24.6 L43.5 24.6" stroke="#e0b23e" strokeWidth="1.1" strokeLinecap="round" />
+            <path d="M30.4 27.2 Q32 26 33.6 27.2" stroke="#e0b23e" strokeWidth="1" fill="none" />
+            <path d="M21 25.4 L19.4 26.6 M43 25.4 L44.6 26.6" stroke="#c89a2e" strokeWidth="0.9" strokeLinecap="round" />
+            {/* lenses with sky reflection + glint */}
+            <rect x="21.6" y="24.4" width="9.2" height="6.2" rx="2.6" fill={url("lens")} stroke="#e0b23e" strokeWidth="0.9" />
+            <rect x="33.2" y="24.4" width="9.2" height="6.2" rx="2.6" fill={url("lens")} stroke="#e0b23e" strokeWidth="0.9" />
+            <path d="M23.4 29.4 L27.4 25.1 M25.4 29.9 L28.9 26.1" stroke="#fff" strokeWidth="0.8" opacity="0.55" strokeLinecap="round" />
+            <path d="M35 29.4 L39 25.1 M37 29.9 L40.5 26.1" stroke="#fff" strokeWidth="0.8" opacity="0.55" strokeLinecap="round" />
           </g>
         )}
         {config.extra === "extra-scarf" && (
           <g>
-            <path d="M18 45 Q32 52 46 45 L46 50 Q32 57 18 50 Z" fill="#d94848" />
-            <path d="M22 46.5 L24 44 M28 48.5 L30 46 M34 48.5 L36 46 M40 46.5 L42 44" stroke="#e8e8ee" strokeWidth="2" />
+            {/* hanging tail with stripes + fringe */}
+            <path d="M36.5 47.5 L41.5 47 L44 59.5 L37.5 60 Z" fill={url("scarf")} />
+            <path d="M37.8 51.8 L42.4 51.3 M38.6 55.3 L43.2 54.8" stroke="#f3e3d3" strokeWidth="1.7" opacity="0.95" />
+            <path d="M38.5 60 L38.3 62.5 M40.4 59.9 L40.4 62.4 M42.3 59.7 L42.6 62.2" stroke="#9c221e" strokeWidth="1.1" strokeLinecap="round" />
+            {/* neck wrap */}
+            <path d="M18.5 44.5 Q32 51.5 45.5 44.5 L45.5 49.8 Q32 56.8 18.5 49.8 Z" fill={url("scarf")} />
+            <path d="M18.5 44.7 Q32 51.7 45.5 44.7" stroke="#ffb1a6" strokeWidth="0.8" fill="none" opacity="0.6" />
+            {/* knit stripes */}
+            <path d="M22.5 46.6 L24.5 44.1 M28.5 48.7 L30.5 46.2 M34.5 48.7 L36.5 46.2 M40.5 46.6 L42.5 44.1" stroke="#f3e3d3" strokeWidth="1.9" strokeLinecap="round" />
+            {/* knit texture */}
+            <path d="M19 47.8 Q32 54.6 45 47.8" stroke="#6d1512" strokeWidth="0.7" fill="none" opacity="0.45" />
           </g>
         )}
         {config.extra === "extra-armband" && (
-          <path d="M13.5 55 L21 51.5 L21 58 L13.5 61.5 Z" fill="#ffc93c" />
+          <g>
+            <path d="M13 54.5 L21.5 50.8 L21.5 58 L13 61.6 Z" fill={url("gold")} stroke="#8a5f06" strokeWidth="0.7" />
+            <path d="M13.4 55 L21.1 51.6" stroke="#fff3b8" strokeWidth="0.8" opacity="0.8" />
+            {/* the captain's C */}
+            <path d="M19 54.2 Q16.2 53.6 16.2 56 Q16.2 58.4 19 57.8" stroke="#6b4a04" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+          </g>
         )}
         {config.extra === "extra-medal" && (
           <g>
-            <path d="M28 46 L32 54 L36 46" stroke="#d94848" strokeWidth="2.5" fill="none" />
-            <circle cx="32" cy="56" r="4" fill="#ffc93c" stroke="#8a5f06" strokeWidth="1" />
+            {/* striped ribbon */}
+            <path d="M28 45 L32 53.5 L36 45" stroke="#c93a3a" strokeWidth="3.6" fill="none" />
+            <path d="M28 45 L32 53.5 L36 45" stroke="#f3e9e0" strokeWidth="1.2" fill="none" />
+            {/* disc with rim, emboss and glint */}
+            <circle cx="32" cy="56.5" r="4.6" fill={url("gold")} stroke="#8a5f06" strokeWidth="0.9" />
+            <circle cx="32" cy="56.5" r="3.3" fill="none" stroke="#a06e08" strokeWidth="0.5" opacity="0.8" />
+            <path
+              d="M32 54.3 L32.7 55.8 L34.3 56 L33.1 57.1 L33.4 58.7 L32 57.9 L30.6 58.7 L30.9 57.1 L29.7 56 L31.3 55.8 Z"
+              fill="#8a5f06"
+            />
+            <circle cx="30.4" cy="54.9" r="0.8" fill="#fff" opacity="0.75" />
           </g>
         )}
 
-        {/* headwear */}
+        {/* ---------------- headwear ---------------- */}
         {config.head === "head-cap" && (
           <g>
-            <path d="M19 22 Q20 12 32 12 Q44 12 45 22 Z" fill="#2b4fa3" />
-            <path d="M17 22 L47 22 Q49 22 49 24 L47 25 L17 25 Z" fill="#1e3a7d" />
+            <path d="M19 22 Q20 11.5 32 11.5 Q44 11.5 45 22 Z" fill={url("cap")} />
+            {/* panel seams + button */}
+            <path d="M32 11.5 L32 22 M25.7 13.4 Q26.6 17.6 26.2 22 M38.3 13.4 Q37.4 17.6 37.8 22" stroke="#1a3166" strokeWidth="0.6" fill="none" opacity="0.9" />
+            <circle cx="32" cy="11.4" r="1.1" fill="#1a3166" />
+            <ellipse cx="26.5" cy="15" rx="3.4" ry="1.9" fill="#fff" opacity="0.22" transform="rotate(-18 26.5 15)" />
+            {/* brim: lit top + shaded underside */}
+            <path d="M16.6 21.5 L47.4 21.5 Q50.6 21.8 50.1 24.1 Q49.7 25.6 47 25.3 L17 24.7 Z" fill="#2b4fa3" />
+            <path d="M17 24.7 L47 25.3 Q49.7 25.6 50.1 24.1 Q49 26.4 46.5 26.1 L17.5 25.5 Z" fill="#152751" />
+            <path d="M17.6 22.3 L46.6 22.3" stroke="#7d9ce8" strokeWidth="0.6" opacity="0.7" />
           </g>
         )}
         {config.head === "head-bucket" && (
           <g>
-            <path d="M21 20 Q22 11 32 11 Q42 11 43 20 Z" fill="#c9b48a" />
-            <path d="M16 20 L48 20 L46 25 L18 25 Z" fill="#b39d72" />
+            <path d="M22 19.5 Q22.5 10.8 32 10.8 Q41.5 10.8 42 19.5 Z" fill={url("canvas")} />
+            {/* crown seam + stitching */}
+            <path d="M22.6 17.2 Q32 15.2 41.4 17.2" stroke="#8a774f" strokeWidth="0.7" fill="none" />
+            <path d="M23.2 16.4 Q32 14.4 40.8 16.4" stroke="#f3ead1" strokeWidth="0.5" strokeDasharray="0.9 1.1" fill="none" opacity="0.9" />
+            {/* eyelets */}
+            <circle cx="27.5" cy="14" r="0.55" fill="#8a774f" />
+            <circle cx="36.5" cy="14" r="0.55" fill="#8a774f" />
+            {/* sloped brim with stitched edge */}
+            <path d="M15.5 19.5 L48.5 19.5 L46 25.4 Q32 27.2 18 25.4 Z" fill="#b39d72" />
+            <path d="M15.5 19.5 L48.5 19.5 L48 20.7 L16 20.7 Z" fill="#c9b48a" />
+            <path d="M17.2 24.1 Q32 25.9 46.8 24.1" stroke="#f3ead1" strokeWidth="0.55" strokeDasharray="1 1.2" fill="none" opacity="0.9" />
+            <ellipse cx="27" cy="13.5" rx="3" ry="1.6" fill="#fff" opacity="0.25" transform="rotate(-16 27 13.5)" />
           </g>
         )}
         {config.head === "head-viking" && (
           <g>
-            <path d="M20 22 Q21 12 32 12 Q43 12 44 22 Z" fill="#8f979f" />
-            <path d="M20 22 L44 22 L44 25 L20 25 Z" fill="#6f767e" />
-            <path d="M18 20 Q13 14 15 8 Q20 12 21 17 Z" fill="#e8e0ce" />
-            <path d="M46 20 Q51 14 49 8 Q44 12 43 17 Z" fill="#e8e0ce" />
+            {/* horns: ringed, curving out */}
+            <path d="M19.5 21 Q11.8 16.5 13.6 7 Q20.4 10.6 21.8 18 Z" fill={url("bone")} stroke="#9c8a62" strokeWidth="0.6" />
+            <path d="M44.5 21 Q52.2 16.5 50.4 7 Q43.6 10.6 42.2 18 Z" fill={url("bone")} stroke="#9c8a62" strokeWidth="0.6" />
+            <path d="M15.5 13.5 Q18.5 13.9 20.6 15.8 M14.4 10 Q17.4 10.6 19.6 12.6" stroke="#9c8a62" strokeWidth="0.6" fill="none" opacity="0.8" />
+            <path d="M48.5 13.5 Q45.5 13.9 43.4 15.8 M49.6 10 Q46.6 10.6 44.4 12.6" stroke="#9c8a62" strokeWidth="0.6" fill="none" opacity="0.8" />
+            {/* dome with central ridge */}
+            <path d="M20 22 Q21 11.5 32 11.5 Q43 11.5 44 22 Z" fill={url("metal")} />
+            <path d="M32 11.5 L32 22" stroke="#dde4ec" strokeWidth="1.8" />
+            <path d="M32 11.5 L32 22" stroke="#59626d" strokeWidth="0.5" opacity="0.6" />
+            <ellipse cx="26" cy="15" rx="3.2" ry="1.7" fill="#fff" opacity="0.35" transform="rotate(-20 26 15)" />
+            {/* riveted brow band */}
+            <path d="M19.5 20.7 L44.5 20.7 L44.5 24 L19.5 24 Z" fill="#59626d" />
+            <path d="M19.5 20.7 L44.5 20.7" stroke="#8f99a5" strokeWidth="0.6" />
+            <circle cx="23" cy="22.4" r="0.7" fill="#c8d1da" />
+            <circle cx="29" cy="22.4" r="0.7" fill="#c8d1da" />
+            <circle cx="35" cy="22.4" r="0.7" fill="#c8d1da" />
+            <circle cx="41" cy="22.4" r="0.7" fill="#c8d1da" />
           </g>
         )}
         {config.head === "head-halo" && (
-          <ellipse cx="32" cy="10" rx="11" ry="3.2" fill="none" stroke="#ffe9a3" strokeWidth="2.5" />
+          <g>
+            {/* layered glow, no filters needed */}
+            <ellipse cx="32" cy="9.5" rx="12.5" ry="4" fill="none" stroke="#ffe9a3" strokeWidth="5" opacity="0.14" />
+            <ellipse cx="32" cy="9.5" rx="11.6" ry="3.6" fill="none" stroke="#ffdf7e" strokeWidth="3" opacity="0.35" />
+            <ellipse cx="32" cy="9.5" rx="11" ry="3.2" fill="none" stroke="#ffd75e" strokeWidth="1.9" />
+            <ellipse cx="32" cy="9.1" rx="10.4" ry="2.7" fill="none" stroke="#fffbe8" strokeWidth="0.8" opacity="0.9" />
+            {/* sparkles */}
+            <path d="M45.5 7 L46.1 8.4 L47.5 9 L46.1 9.6 L45.5 11 L44.9 9.6 L43.5 9 L44.9 8.4 Z" fill="#fff6d8" />
+            <path d="M19 12.5 L19.4 13.4 L20.3 13.8 L19.4 14.2 L19 15.1 L18.6 14.2 L17.7 13.8 L18.6 13.4 Z" fill="#ffe9a3" opacity="0.9" />
+          </g>
         )}
         {config.head === "head-crown" && (
           <g>
-            <path d="M21 20 L21 12 L26 16 L32 9 L38 16 L43 12 L43 20 Z" fill="#ffc93c" stroke="#8a5f06" strokeWidth="1" />
-            <circle cx="26" cy="18" r="1.2" fill="#d94848" />
-            <circle cx="32" cy="17" r="1.2" fill="#2b4fa3" />
-            <circle cx="38" cy="18" r="1.2" fill="#2e9e5b" />
+            {/* points with pearls */}
+            <path d="M21.5 17.5 L21.5 9.5 L26.5 13.8 L32 7 L37.5 13.8 L42.5 9.5 L42.5 17.5 Z" fill={url("gold")} stroke="#8a5f06" strokeWidth="0.8" strokeLinejoin="round" />
+            <path d="M22.6 15.5 L22.6 11.6 M32 9 L32 13.5" stroke="#fff3b8" strokeWidth="0.7" opacity="0.7" />
+            <circle cx="21.5" cy="9" r="1.4" fill={url("pearl")} stroke="#8a8fae" strokeWidth="0.3" />
+            <circle cx="32" cy="6.4" r="1.5" fill={url("pearl")} stroke="#8a8fae" strokeWidth="0.3" />
+            <circle cx="42.5" cy="9" r="1.4" fill={url("pearl")} stroke="#8a8fae" strokeWidth="0.3" />
+            {/* jewelled band */}
+            <rect x="20.8" y="16.8" width="22.4" height="4.6" rx="1.2" fill={url("gold")} stroke="#8a5f06" strokeWidth="0.8" />
+            <path d="M21.6 17.7 L42.4 17.7" stroke="#fff3b8" strokeWidth="0.7" opacity="0.8" />
+            {/* ruby / sapphire / emerald with glints */}
+            <path d="M26 17.6 L27.5 19.1 L26 20.6 L24.5 19.1 Z" fill="#e04545" stroke="#7e1414" strokeWidth="0.4" />
+            <circle cx="32" cy="19.1" r="1.5" fill="#3e63d8" stroke="#16265e" strokeWidth="0.4" />
+            <path d="M38 17.6 L39.5 19.1 L38 20.6 L36.5 19.1 Z" fill="#2eae62" stroke="#0d4f28" strokeWidth="0.4" />
+            <circle cx="25.6" cy="18.6" r="0.4" fill="#fff" opacity="0.9" />
+            <circle cx="31.6" cy="18.6" r="0.4" fill="#fff" opacity="0.9" />
+            <circle cx="37.6" cy="18.6" r="0.4" fill="#fff" opacity="0.9" />
           </g>
         )}
       </g>

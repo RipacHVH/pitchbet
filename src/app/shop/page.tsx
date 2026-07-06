@@ -200,7 +200,7 @@ export default function ShopPage() {
                       >
                         <div className="flex items-center gap-3">
                           {item.slot !== "flex" ? (
-                            <ManagerAvatar config={preview} size={52} />
+                            <ManagerAvatar config={preview} size={72} />
                           ) : (
                             <span className="text-4xl">⭐</span>
                           )}

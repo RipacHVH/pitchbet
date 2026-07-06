@@ -29,7 +29,7 @@ Schema is created automatically on first request (`ensureSchema()` in `src/lib/d
 ## Freeplay coins, the daily wheel & the Locker Room
 
 - **Daily spin**: one wheel spin per UTC day — 25 up to a 1,000-coin jackpot (~76 average, weighted so rarity strictly decreases as the prize grows: 25 lands 40% of spins, 1000 lands 0.7%). The prize is rolled server-side; the wheel animation just lands on it.
-- **The Locker Room** (`/shop`): everything costs coins, nothing costs money. Customize your manager (skin tone, hair, free kits) and grind for cosmetics — kits (500–2,500), headwear up to The Crown (5,000), extras like the Captain's Armband, plus **1 free month of Pro for 10,000 coins** (redeemable when subscriptions launch). Your avatar shows on every arena table and the world rankings.
+- **The Locker Room** (`/shop`): everything costs coins, nothing costs money. Customize your manager (skin tone, hair, free kits) and grind for cosmetics — kits (500–2,500), headwear up to The Crown (5,000), extras like the Captain's Armband, plus **1 free month of Pro for 100,000 coins** (redeemable when subscriptions launch). Your avatar shows on every arena table and the world rankings.
 - **Accounts**: register with a manager name + password (scrypt-hashed). Log in from any device; pre-accounts players claim their name by setting a password on first login.
 
 ## Deploy status

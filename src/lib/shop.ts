@@ -33,7 +33,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     id: "flex-pro-month",
     slot: "flex",
     name: "1 Month of Pro, Free",
-    cost: 10_000,
+    cost: 100_000,
     desc: "Redeemable when subscriptions launch — buy now, flex forever",
   },
 ];

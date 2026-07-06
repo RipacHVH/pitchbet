@@ -229,17 +229,17 @@ export function ManagerAvatar({ config, size = 40 }: { config: AvatarConfig; siz
         {config.hair === 0 && (
           <path d="M25 20 Q27.4 16.6 31.4 16.1" stroke="#fff" strokeWidth="2.2" fill="none" opacity="0.3" strokeLinecap="round" />
         )}
+        {/* rosy cheeks — on the skin, so hair drapes over them */}
+        <ellipse cx="23.2" cy="31.4" rx="2" ry="1.25" fill="#ff6f61" opacity="0.3" />
+        <ellipse cx="40.8" cy="31.4" rx="2" ry="1.25" fill="#ff6f61" opacity="0.3" />
 
         {/* hair styles: 0 bald, 1 short, 2 spiky, 3 curly, 4 long */}
         {config.hair === 1 && (
           <g fill={url("hairg")}>
             <path d="M19 27 Q20 15.4 32 15 Q44 15.4 45 27 Q44 20.3 32 19.6 Q20 20.3 19 27 Z" />
-            {/* scalloped fringe */}
-            <path d="M21.4 20.9 Q23.2 23.6 25.9 21.2 Q23.6 19.8 21.4 20.9 Z" />
-            <path d="M26.7 21.2 Q29 24.1 31.7 21.3 Q29.1 19.7 26.7 21.2 Z" />
-            <path d="M32.3 21.3 Q35 24 37.3 21.2 Q34.9 19.7 32.3 21.3 Z" />
-            <path d="M38.1 21.2 Q40.4 23.4 42.6 20.9 Q40.4 19.8 38.1 21.2 Z" />
-            <path d="M23 18.4 Q27 16.2 31 16.2" stroke={shade(hairC, 0.4)} strokeWidth="0.9" fill="none" opacity="0.7" strokeLinecap="round" />
+            {/* single smooth side-swept fringe */}
+            <path d="M20.8 22 Q28 24.6 36 20.6 Q28 19.2 20.8 22 Z" />
+            <path d="M23 18.4 Q27 16.2 31 16.2" stroke={shade(hairC, 0.4)} strokeWidth="0.9" fill="none" opacity="0.6" strokeLinecap="round" />
           </g>
         )}
         {config.hair === 2 && (
@@ -252,8 +252,6 @@ export function ManagerAvatar({ config, size = 40 }: { config: AvatarConfig; siz
             <path d="M31.4 16 Q34 9.4 37.6 16.4 Q34.4 15.4 31.4 16 Z" />
             <path d="M38.2 17 Q42.6 11.6 43.8 18.8 Q41 17.2 38.2 17 Z" />
             <path d="M43 20.6 Q46.6 17.4 45.4 24 Q44.4 22 43 20.6 Z" />
-            <path d="M27 14.4 Q28.4 12.4 30 13.4" stroke={shade(hairC, 0.4)} strokeWidth="0.9" fill="none" strokeLinecap="round" opacity="0.75" />
-            <path d="M33.6 12.8 Q34.8 11.6 35.9 12.9" stroke={shade(hairC, 0.4)} strokeWidth="0.8" fill="none" strokeLinecap="round" opacity="0.7" />
           </g>
         )}
         {config.hair === 3 && (
@@ -300,9 +298,6 @@ export function ManagerAvatar({ config, size = 40 }: { config: AvatarConfig; siz
         {/* button nose */}
         <ellipse cx="32" cy="30.9" rx="1.15" ry="0.9" fill={shade(skin, -0.16)} />
         <circle cx="31.6" cy="30.6" r="0.35" fill="#fff" opacity="0.55" />
-        {/* rosy cheeks */}
-        <ellipse cx="23.2" cy="31.4" rx="2" ry="1.25" fill="#ff6f61" opacity="0.3" />
-        <ellipse cx="40.8" cy="31.4" rx="2" ry="1.25" fill="#ff6f61" opacity="0.3" />
         {/* open smile: clean D-mouth with teeth and tongue */}
         <path d="M28 33.3 Q32 34.2 36 33.3 Q36.6 33.2 36.5 33.9 Q35.7 38.9 32 38.9 Q28.3 38.9 27.5 33.9 Q27.4 33.2 28 33.3 Z" fill="#7c3142" />
         <path d="M28.6 34 Q32 34.8 35.4 34 L35.2 35.3 Q32 36 28.8 35.3 Z" fill="#fff" />

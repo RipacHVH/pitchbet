@@ -84,7 +84,7 @@ export function Hud({ pulse = false }: { pulse?: boolean }) {
               href="/"
               className="display mr-1 text-xl text-white drop-shadow-[0_2px_0_rgba(0,0,0,.6)]"
             >
-              Pitch<span className="text-gold-400">Bet</span>
+              Fut<span className="text-gold-400">caster</span>
             </Link>
             {tab("/", "Play")}
             {tab("/arena", "Arena")}

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getOrCreateOpenArena, arenaPayload } from "@/lib/arena";
+import { getOrCreateOpenArena, arenaPayload, listMyArenas } from "@/lib/arena";
 import { listChallenges } from "@/lib/challenges";
 import { refreshStaleFixtures } from "@/lib/fixtures";
 import { currentPlayer } from "@/lib/identity";
@@ -16,7 +16,7 @@ export async function GET() {
 
   const arena = await getOrCreateOpenArena();
   const lastSettled = await db().one<ArenaRow>(
-    "SELECT * FROM arenas WHERE status = 'settled' ORDER BY settled_at DESC LIMIT 1",
+    "SELECT * FROM arenas WHERE status = 'settled' AND is_private = false ORDER BY settled_at DESC LIMIT 1",
   );
 
   return NextResponse.json({
@@ -25,5 +25,6 @@ export async function GET() {
     tiers: TIERS,
     me: player ? { id: player.id, username: player.username, rp: player.rp } : null,
     challenges: arena && player ? await listChallenges(arena.id, player.id) : [],
+    myLeagues: player ? await listMyArenas(player.id) : [],
   });
 }

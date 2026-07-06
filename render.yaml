@@ -1,4 +1,4 @@
-# Render Blueprint — deploys PitchBet as one always-on web service. Game data
+# Render Blueprint — deploys Futcaster as one always-on web service. Game data
 # lives in Supabase Postgres (free tier), so no persistent disk is needed —
 # this can run on Render's free plan. Everyone who visits the URL plays in
 # the same arenas.
@@ -6,7 +6,7 @@
 # Deploy: push this repo to GitHub, then Render Dashboard -> New -> Blueprint.
 services:
   - type: web
-    name: pitchbet
+    name: futcaster
     runtime: node
     plan: free
     buildCommand: npm install && npm run build

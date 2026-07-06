@@ -18,8 +18,10 @@ import type {
   Challenge,
   Fixture,
   LeaderboardResponse,
+  MyArenaSummary,
   Selection,
   SettleSummary,
+  SingleArenaResponse,
 } from "@/lib/types";
 
 function rpForOdds(odds: number): number {
@@ -38,6 +40,11 @@ export default function ArenaPage() {
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [reveal, setReveal] = useState<RevealItem[] | null>(null);
 
+  // null = viewing the public Matchday; otherwise the id of a private league.
+  const [viewingArenaId, setViewingArenaId] = useState<number | null>(null);
+  const [viewedArena, setViewedArena] = useState<SingleArenaResponse | null>(null);
+  const [freshInviteCode, setFreshInviteCode] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     const [arenaRes, boardRes] = await Promise.all([
       fetch("/api/arena"),
@@ -47,11 +54,27 @@ export default function ArenaPage() {
     if (boardRes.ok) setBoard(await boardRes.json());
   }, []);
 
+  const loadViewedArena = useCallback(async (id: number) => {
+    const res = await fetch(`/api/arena/${id}`);
+    if (res.ok) setViewedArena(await res.json());
+  }, []);
+
+  const refreshAll = useCallback(async () => {
+    await Promise.all([load(), viewingArenaId !== null ? loadViewedArena(viewingArenaId) : null]);
+  }, [load, loadViewedArena, viewingArenaId]);
+
   useEffect(() => {
     load();
     const t = setInterval(load, 30_000);
     return () => clearInterval(t);
   }, [load]);
+
+  useEffect(() => {
+    if (viewingArenaId === null) return;
+    loadViewedArena(viewingArenaId);
+    const t = setInterval(() => loadViewedArena(viewingArenaId), 30_000);
+    return () => clearInterval(t);
+  }, [viewingArenaId, loadViewedArena]);
 
   const handleJoined = async () => {
     await Promise.all([refreshMe(), load()]);
@@ -73,7 +96,7 @@ export default function ArenaPage() {
       kind: "ok",
       text: "You're in. Call each match — the odds are the rank points you're playing for.",
     });
-    await load();
+    await refreshAll();
   };
 
   const checkResults = async () => {
@@ -109,7 +132,7 @@ export default function ArenaPage() {
             : "The table updates as matches finish. No new final whistles yet.",
       });
     }
-    await Promise.all([load(), refreshMe()]);
+    await Promise.all([refreshAll(), refreshMe()]);
   };
 
   const sendChallenge = async (arenaId: number, opponentUsername: string) => {
@@ -124,7 +147,7 @@ export default function ArenaPage() {
       return;
     }
     setNotice({ kind: "ok", text: `Challenge sent to ${opponentUsername}.` });
-    await load();
+    await refreshAll();
   };
 
   const respondChallenge = async (challengeId: number, accept: boolean) => {
@@ -137,6 +160,37 @@ export default function ArenaPage() {
       setNotice({ kind: "err", text: (await res.json()).message ?? "Couldn't respond." });
       return;
     }
+    await refreshAll();
+  };
+
+  const createLeague = async (name: string) => {
+    const res = await fetch("/api/arena/private", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    const body = await res.json();
+    if (!res.ok) {
+      setNotice({ kind: "err", text: body.message ?? "Couldn't create the league." });
+      return;
+    }
+    setFreshInviteCode(body.inviteCode);
+    setViewingArenaId(body.arenaId);
+    await load();
+  };
+
+  const joinByCode = async (code: string) => {
+    const res = await fetch("/api/arena/join-code", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    });
+    const body = await res.json();
+    if (!res.ok) {
+      setNotice({ kind: "err", text: body.message ?? "Couldn't join that league." });
+      return;
+    }
+    setViewingArenaId(body.arenaId);
     await load();
   };
 
@@ -180,35 +234,243 @@ export default function ArenaPage() {
           <p className="py-16 text-center font-bold text-lilac-400">Opening the gates…</p>
         ) : !joined ? (
           <JoinGate onJoined={handleJoined} />
-        ) : current ? (
-          <ArenaBoard
-            info={current}
-            meId={data.me?.id ?? null}
-            challenges={data.challenges}
-            busy={busy}
-            onEnter={() => enterArena(current.arena.id)}
-            onPickLocked={load}
-            onCheckResults={checkResults}
-            onSendChallenge={(username) => sendChallenge(current.arena.id, username)}
-            onRespondChallenge={respondChallenge}
-          />
-        ) : showSettled ? (
-          <>
-            <SettledArena info={showSettled} meId={data.me?.id ?? null} />
-            <p className="mt-4 text-center text-sm font-bold text-lilac-300">
-              A new arena opens as soon as the next matches get odds.
-            </p>
-          </>
         ) : (
-          <p className="py-16 text-center font-bold text-lilac-400">
-            No arena right now — needs at least two upcoming matches with odds.
-          </p>
+          <>
+            <MyLeagues
+              leagues={data.myLeagues}
+              viewingArenaId={viewingArenaId}
+              freshInviteCode={freshInviteCode}
+              onView={(id) => {
+                setFreshInviteCode(null);
+                setViewingArenaId(id);
+              }}
+              onBack={() => {
+                setFreshInviteCode(null);
+                setViewingArenaId(null);
+              }}
+              onCreate={createLeague}
+              onJoinCode={joinByCode}
+            />
+
+            {viewingArenaId !== null ? (
+              !viewedArena ? (
+                <p className="py-16 text-center font-bold text-lilac-400">Loading your league…</p>
+              ) : viewedArena.arena.arena.status === "open" ? (
+                <ArenaBoard
+                  info={viewedArena.arena}
+                  meId={me?.joined ? (data.me?.id ?? null) : null}
+                  challenges={viewedArena.challenges}
+                  busy={busy}
+                  onEnter={() => enterArena(viewedArena.arena.arena.id)}
+                  onPickLocked={refreshAll}
+                  onCheckResults={checkResults}
+                  onSendChallenge={(username) => sendChallenge(viewedArena.arena.arena.id, username)}
+                  onRespondChallenge={respondChallenge}
+                />
+              ) : (
+                <SettledArena info={viewedArena.arena} meId={data.me?.id ?? null} />
+              )
+            ) : current ? (
+              <ArenaBoard
+                info={current}
+                meId={data.me?.id ?? null}
+                challenges={data.challenges}
+                busy={busy}
+                onEnter={() => enterArena(current.arena.id)}
+                onPickLocked={refreshAll}
+                onCheckResults={checkResults}
+                onSendChallenge={(username) => sendChallenge(current.arena.id, username)}
+                onRespondChallenge={respondChallenge}
+              />
+            ) : showSettled ? (
+              <>
+                <SettledArena info={showSettled} meId={data.me?.id ?? null} />
+                <p className="mt-4 text-center text-sm font-bold text-lilac-300">
+                  A new arena opens as soon as the next matches get odds.
+                </p>
+              </>
+            ) : (
+              <p className="py-16 text-center font-bold text-lilac-400">
+                No arena right now — needs at least two upcoming matches with odds.
+              </p>
+            )}
+          </>
         )}
 
         {board && board.players.length > 0 && <WorldRankings board={board} />}
       </main>
 
       {reveal && <ResultReveal items={reveal} onDone={() => setReveal(null)} />}
+    </div>
+  );
+}
+
+/* ---------------- Private leagues (fantasy-style groups) ---------------- */
+
+function MyLeagues({
+  leagues,
+  viewingArenaId,
+  freshInviteCode,
+  onView,
+  onBack,
+  onCreate,
+  onJoinCode,
+}: {
+  leagues: MyArenaSummary[];
+  viewingArenaId: number | null;
+  freshInviteCode: string | null;
+  onView: (id: number) => void;
+  onBack: () => void;
+  onCreate: (name: string) => Promise<void>;
+  onJoinCode: (code: string) => Promise<void>;
+}) {
+  const [mode, setMode] = useState<"create" | "join" | null>(null);
+  const [name, setName] = useState("");
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const submitCreate = async () => {
+    if (name.trim().length < 3) return;
+    setBusy(true);
+    await onCreate(name.trim());
+    setBusy(false);
+    setName("");
+    setMode(null);
+  };
+
+  const submitJoin = async () => {
+    if (code.trim().length < 4) return;
+    setBusy(true);
+    await onJoinCode(code.trim());
+    setBusy(false);
+    setCode("");
+    setMode(null);
+  };
+
+  return (
+    <div className="mb-6">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="display text-lg text-white">My leagues</h2>
+        <div className="flex gap-1.5">
+          {viewingArenaId !== null && (
+            <button
+              onClick={onBack}
+              className="btn-press rounded-xl border-b-night-950 bg-night-600 px-3 py-1.5 text-sm font-extrabold text-lilac-200 hover:bg-night-500"
+            >
+              ← Matchday
+            </button>
+          )}
+          <button
+            onClick={() => setMode(mode === "create" ? null : "create")}
+            className="btn-press rounded-xl border-b-night-950 bg-night-600 px-3 py-1.5 text-sm font-extrabold text-lilac-200 hover:bg-night-500"
+          >
+            {mode === "create" ? "Cancel" : "🏟️ Create"}
+          </button>
+          <button
+            onClick={() => setMode(mode === "join" ? null : "join")}
+            className="btn-press rounded-xl border-b-gold-800 bg-gold-400 px-3 py-1.5 text-sm font-extrabold text-night-950 hover:bg-gold-300"
+          >
+            {mode === "join" ? "Cancel" : "Join with code"}
+          </button>
+        </div>
+      </div>
+
+      {freshInviteCode && (
+        <div className="pop-in mb-3 rounded-2xl border-2 border-gold-600/70 bg-night-700 p-4 text-center">
+          <p className="text-xs font-extrabold uppercase tracking-widest text-lilac-300">
+            League created! Share this code
+          </p>
+          <p className="display mt-1 text-3xl tracking-[0.3em] text-gold-300">{freshInviteCode}</p>
+        </div>
+      )}
+
+      {mode === "create" && (
+        <div className="pop-in mb-3 flex gap-2 rounded-2xl border-2 border-gold-600/40 bg-night-800 p-3">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && submitCreate()}
+            placeholder="League name, e.g. Sunday Sweats"
+            maxLength={40}
+            autoFocus
+            aria-label="League name"
+            className="flex-1 rounded-xl border-2 border-white/15 bg-night-900 px-3 py-2 font-bold text-white placeholder:text-lilac-400/50 focus:border-gold-400 focus:outline-none"
+          />
+          <button
+            onClick={submitCreate}
+            disabled={busy || name.trim().length < 3}
+            className="btn-press shrink-0 rounded-xl border-b-gold-800 bg-gold-400 px-4 py-2 text-sm font-black text-night-950 hover:bg-gold-300 disabled:opacity-40"
+          >
+            {busy ? "…" : "Create"}
+          </button>
+        </div>
+      )}
+
+      {mode === "join" && (
+        <div className="pop-in mb-3 flex gap-2 rounded-2xl border-2 border-gold-600/40 bg-night-800 p-3">
+          <input
+            value={code}
+            onChange={(e) => setCode(e.target.value.toUpperCase())}
+            onKeyDown={(e) => e.key === "Enter" && submitJoin()}
+            placeholder="Invite code"
+            maxLength={6}
+            autoFocus
+            aria-label="Invite code"
+            className="flex-1 rounded-xl border-2 border-white/15 bg-night-900 px-3 py-2 text-center font-mono font-bold uppercase tracking-[0.3em] text-white placeholder:text-lilac-400/50 focus:border-gold-400 focus:outline-none"
+          />
+          <button
+            onClick={submitJoin}
+            disabled={busy || code.trim().length < 4}
+            className="btn-press shrink-0 rounded-xl border-b-gold-800 bg-gold-400 px-4 py-2 text-sm font-black text-night-950 hover:bg-gold-300 disabled:opacity-40"
+          >
+            {busy ? "…" : "Join"}
+          </button>
+        </div>
+      )}
+
+      {leagues.length > 0 ? (
+        <ul className="flex flex-col gap-2">
+          {leagues.map((l) => (
+            <li
+              key={l.id}
+              className={`flex items-center gap-3 rounded-2xl border-2 px-3 py-2.5 ${
+                viewingArenaId === l.id
+                  ? "border-gold-600/70 bg-night-600"
+                  : "border-white/10 bg-night-800/80"
+              }`}
+            >
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-bold text-white">{l.name}</p>
+                <p className="text-[10px] font-bold uppercase tracking-wide text-lilac-400">
+                  {l.memberCount} member{l.memberCount === 1 ? "" : "s"} · {l.status === "open" ? "in play" : "final"}
+                  {l.inviteCode && ` · code ${l.inviteCode}`}
+                </p>
+              </div>
+              <span
+                className={`shrink-0 font-mono text-sm font-bold ${
+                  l.points >= 0 ? "text-gold-300" : "text-danger-300"
+                }`}
+              >
+                {pointsLabel(l.points)} RP
+              </span>
+              <button
+                onClick={() => onView(l.id)}
+                disabled={viewingArenaId === l.id}
+                className="btn-press shrink-0 rounded-lg border-b-gold-800 bg-gold-400 px-3 py-1.5 text-xs font-extrabold text-night-950 hover:bg-gold-300 disabled:opacity-50"
+              >
+                {viewingArenaId === l.id ? "Viewing" : "View"}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        !freshInviteCode &&
+        mode === null && (
+          <p className="text-xs font-bold text-lilac-400">
+            No leagues yet — create one for your friend group or join with a code.
+          </p>
+        )
+      )}
     </div>
   );
 }
@@ -248,6 +510,9 @@ function ArenaBoard({
           <p className="text-xs font-bold text-lilac-300">
             {info.fixtures.length} matches · {info.standings.length} player
             {info.standings.length === 1 ? "" : "s"} in
+            {info.arena.is_private && info.arena.invite_code && (
+              <> · code <span className="font-mono text-gold-300">{info.arena.invite_code}</span></>
+            )}
           </p>
         </div>
         {entered ? (

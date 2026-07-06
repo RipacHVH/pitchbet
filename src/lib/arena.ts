@@ -42,17 +42,14 @@ export interface ArenaRevealItem {
   won: boolean;
 }
 
-/** The one open arena, creating it from the next upcoming matches if needed. */
+/** The one open *public* arena, creating it from the next upcoming matches if needed. */
 export async function getOrCreateOpenArena(): Promise<ArenaRow | null> {
-  const open = await db().one<ArenaRow>("SELECT * FROM arenas WHERE status = 'open' LIMIT 1");
+  const open = await db().one<ArenaRow>(
+    "SELECT * FROM arenas WHERE status = 'open' AND is_private = false LIMIT 1",
+  );
   if (open) return open;
 
-  const slate = await db().many<{ id: string }>(
-    `SELECT id FROM fixtures
-     WHERE completed = 0 AND commence_time > ? AND home_odds IS NOT NULL
-     ORDER BY commence_time ASC LIMIT ?`,
-    [new Date().toISOString(), SLATE_SIZE],
-  );
+  const slate = await nextSlate();
   if (slate.length < 2) return null;
 
   return withTx(async (tx) => {
@@ -64,6 +61,109 @@ export async function getOrCreateOpenArena(): Promise<ArenaRow | null> {
     }
     return (await tx.one<ArenaRow>("SELECT * FROM arenas WHERE id = ?", [id]))!;
   });
+}
+
+async function nextSlate(): Promise<{ id: string }[]> {
+  return db().many<{ id: string }>(
+    `SELECT id FROM fixtures
+     WHERE completed = 0 AND commence_time > ? AND home_odds IS NOT NULL
+     ORDER BY commence_time ASC LIMIT ?`,
+    [new Date().toISOString(), SLATE_SIZE],
+  );
+}
+
+const CODE_CHARS = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"; // no 0/O/1/I — easy to read aloud
+
+function randomInviteCode(): string {
+  let code = "";
+  for (let i = 0; i < 6; i++) code += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+  return code;
+}
+
+/**
+ * Create a private league: same 5-match slate mechanism as the public
+ * Matchday, but invite-only and independent — many can coexist alongside
+ * each other and the public arena. The creator is auto-entered.
+ */
+export async function createPrivateArena(
+  creatorId: number,
+  name: string,
+): Promise<{ error?: string; arena?: ArenaRow }> {
+  const trimmed = name.trim();
+  if (trimmed.length < 3 || trimmed.length > 40) {
+    return { error: "League name must be 3–40 characters." };
+  }
+
+  const slate = await nextSlate();
+  if (slate.length < 2) {
+    return { error: "Not enough upcoming matches with odds yet — try again soon." };
+  }
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = randomInviteCode();
+    try {
+      return await withTx(async (tx) => {
+        const created = await tx.one<{ id: number }>(
+          "INSERT INTO arenas (name, is_private, invite_code, created_by) VALUES (?, true, ?, ?) RETURNING id",
+          [trimmed, code, creatorId],
+        );
+        const id = created!.id;
+        for (const f of slate) {
+          await tx.exec("INSERT INTO arena_fixtures (arena_id, fixture_id) VALUES (?, ?)", [id, f.id]);
+        }
+        await tx.exec("INSERT INTO arena_entries (arena_id, player_id) VALUES (?, ?)", [id, creatorId]);
+        return { arena: (await tx.one<ArenaRow>("SELECT * FROM arenas WHERE id = ?", [id]))! };
+      });
+    } catch (err) {
+      if (isUniqueViolation(err)) continue; // invite code collision, retry with a new one
+      throw err;
+    }
+  }
+  return { error: "Couldn't generate a unique invite code — try again." };
+}
+
+export async function joinArenaByCode(
+  playerId: number,
+  code: string,
+): Promise<{ error?: string; status?: number; arena?: ArenaRow }> {
+  const arena = await db().one<ArenaRow>("SELECT * FROM arenas WHERE invite_code = ?", [
+    code.trim().toUpperCase(),
+  ]);
+  if (!arena) return { error: "No league with that code.", status: 404 };
+  if (arena.status !== "open") return { error: "That league has already finished.", status: 409 };
+
+  await db().exec(
+    "INSERT INTO arena_entries (arena_id, player_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
+    [arena.id, playerId],
+  );
+  return { arena };
+}
+
+export interface MyArenaSummary {
+  id: number;
+  name: string;
+  status: "open" | "settled";
+  inviteCode: string | null;
+  points: number;
+  finalRank: number | null;
+  memberCount: number;
+}
+
+/** Private leagues this player belongs to, for the "My Leagues" switcher. */
+export async function listMyArenas(playerId: number): Promise<MyArenaSummary[]> {
+  const rows = await db().many<MyArenaSummary>(
+    `SELECT a.id, a.name, a.status, a.invite_code AS "inviteCode",
+            e.points, e.final_rank AS "finalRank",
+            (SELECT COUNT(*) FROM arena_entries e2 WHERE e2.arena_id = a.id) AS "memberCount"
+     FROM arena_entries e
+     JOIN arenas a ON a.id = e.arena_id
+     WHERE e.player_id = ? AND a.is_private = true
+     ORDER BY a.status ASC, a.created_at DESC`,
+    [playerId],
+  );
+  // COUNT(*) comes back as a string via node-postgres; normalize to number.
+  for (const r of rows) r.memberCount = Number(r.memberCount);
+  return rows;
 }
 
 export async function arenaPayload(

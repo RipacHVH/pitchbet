@@ -80,7 +80,13 @@ export interface ArenaStanding {
 }
 
 export interface ArenaInfo {
-  arena: { id: number; name: string; status: "open" | "settled" };
+  arena: {
+    id: number;
+    name: string;
+    status: "open" | "settled";
+    is_private: boolean;
+    invite_code: string | null;
+  };
   fixtures: Fixture[];
   entry: { points: number; final_rank: number | null } | null;
   myBets: ArenaBet[];
@@ -98,10 +104,26 @@ export interface Challenge {
   won: boolean | null;
 }
 
+export interface MyArenaSummary {
+  id: number;
+  name: string;
+  status: "open" | "settled";
+  inviteCode: string | null;
+  points: number;
+  finalRank: number | null;
+  memberCount: number;
+}
+
 export interface ArenaResponse {
   current: ArenaInfo | null;
   lastSettled: ArenaInfo | null;
   me: { id: number; username: string; rp: number } | null;
+  challenges: Challenge[];
+  myLeagues: MyArenaSummary[];
+}
+
+export interface SingleArenaResponse {
+  arena: ArenaInfo;
   challenges: Challenge[];
 }
 

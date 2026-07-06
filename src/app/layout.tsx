@@ -22,8 +22,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PitchBet — call it before kickoff",
-  description: "A football prediction game on real upcoming matches. Pick winners, stack coins.",
+  title: "Futcaster — call it before kickoff",
+  description: "A football forecasting game on real upcoming matches. Pick winners, stack coins.",
 };
 
 export default function RootLayout({

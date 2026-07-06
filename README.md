@@ -1,4 +1,4 @@
-# PitchBet
+# Futcaster
 
 A football prediction game on **real upcoming matches** with **real bookmaker odds** (median consensus across EU books via The Odds API). Solo career betting plus a competitive multiplayer Arena with ranks.
 

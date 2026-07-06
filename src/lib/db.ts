@@ -1,20 +1,20 @@
 import { Pool, type PoolClient } from "pg";
 
 // Singleton across Next.js HMR reloads
-const g = globalThis as unknown as { __pitchbetPool?: Pool; __pitchbetMigrated?: boolean };
+const g = globalThis as unknown as { __futcasterPool?: Pool; __futcasterMigrated?: boolean };
 
 function pool(): Pool {
-  if (!g.__pitchbetPool) {
+  if (!g.__futcasterPool) {
     const connectionString = process.env.DATABASE_URL;
     if (!connectionString) throw new Error("DATABASE_URL is not set");
-    g.__pitchbetPool = new Pool({
+    g.__futcasterPool = new Pool({
       connectionString,
       // Supabase pooled connections terminate TLS with a cert we don't need
       // to verify against a local CA bundle.
       ssl: { rejectUnauthorized: false },
     });
   }
-  return g.__pitchbetPool;
+  return g.__futcasterPool;
 }
 
 /** Convert this codebase's `?` positional placeholders to Postgres `$1, $2, ...`. */
@@ -81,7 +81,7 @@ let migratePromise: Promise<void> | null = null;
 
 /** Idempotent schema setup — safe to call on every cold start. */
 export function ensureSchema(): Promise<void> {
-  if (g.__pitchbetMigrated) return Promise.resolve();
+  if (g.__futcasterMigrated) return Promise.resolve();
   if (!migratePromise) {
     migratePromise = pool()
       .query(
@@ -140,9 +140,16 @@ export function ensureSchema(): Promise<void> {
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
         status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','settled')),
+        is_private BOOLEAN NOT NULL DEFAULT false,
+        invite_code TEXT UNIQUE,
+        created_by INTEGER REFERENCES players(id),
         created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
         settled_at TIMESTAMPTZ
       );
+      -- Already-deployed databases predate the private-league columns.
+      ALTER TABLE arenas ADD COLUMN IF NOT EXISTS is_private BOOLEAN NOT NULL DEFAULT false;
+      ALTER TABLE arenas ADD COLUMN IF NOT EXISTS invite_code TEXT UNIQUE;
+      ALTER TABLE arenas ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES players(id);
 
       CREATE TABLE IF NOT EXISTS arena_fixtures (
         arena_id INTEGER NOT NULL REFERENCES arenas(id),
@@ -200,7 +207,7 @@ export function ensureSchema(): Promise<void> {
     `,
       )
       .then(() => {
-        g.__pitchbetMigrated = true;
+        g.__futcasterMigrated = true;
       });
   }
   return migratePromise;
@@ -268,6 +275,9 @@ export interface ArenaRow {
   id: number;
   name: string;
   status: "open" | "settled";
+  is_private: boolean;
+  invite_code: string | null;
+  created_by: number | null;
   created_at: string;
   settled_at: string | null;
 }

@@ -243,12 +243,18 @@ export function ManagerAvatar({ config, size = 40 }: { config: AvatarConfig; siz
           top of, and overlapping into, that same solid shape.
         */}
         {config.hair === 1 && (
-          <g fill={url("hairg")}>
-            <path d="M18.2 26.6 Q17.6 15.1 32 14.6 Q46.4 15.1 45.8 26.6 Q45 20.6 32 19.8 Q19 20.6 18.2 26.6 Z" />
-            {/* single smooth side-swept fringe, overlapping up into the cap */}
-            <path d="M19.6 21.6 Q28 26 44 21.1 Q28 19.4 19.6 21.6 Z" />
+          <>
+            {/* solid dome — one simple closed shape, guaranteed gap-free (no inner-notch self-intersection) */}
+            <path d="M18 26 Q17 14.3 32 13.8 Q47 14.3 46 26 Q46 29 44 30.5 L20 30.5 Q18 29 18 26 Z" fill={url("hairg")} />
+            {/* skin cutout restores the face on top, leaving a solid hair rim — a plain ellipse can't leave gaps */}
+            <ellipse cx="32" cy="30" rx="11.4" ry="10.6" fill={url("skin")} />
+            {/* re-lay the blush the cutout just painted over */}
+            <ellipse cx="23.2" cy="31.4" rx="2" ry="1.25" fill="#ff6f61" opacity="0.3" />
+            <ellipse cx="40.8" cy="31.4" rx="2" ry="1.25" fill="#ff6f61" opacity="0.3" />
+            {/* fringe sits on the rim, overlapping generously so it can't leave a gap */}
+            <path d="M19.5 21.8 Q28 26.4 44.5 21.3 Q28 19.2 19.5 21.8 Z" fill={url("hairg")} />
             <path d="M23 18 Q27 16 31 16.2" stroke={shade(hairC, 0.4)} strokeWidth="0.9" fill="none" opacity="0.6" strokeLinecap="round" />
-          </g>
+          </>
         )}
         {config.hair === 2 && (
           <g fill={url("hairg")}>
@@ -280,18 +286,21 @@ export function ManagerAvatar({ config, size = 40 }: { config: AvatarConfig; siz
           </g>
         )}
         {config.hair === 4 && (
-          <g fill={url("hairg")}>
-            {/* crown cap, blending into the long side flaps below */}
-            <path d="M18 25 Q17 14.6 32 14.2 Q47 14.6 46 25 Q44.5 19.6 32 19 Q19.5 19.6 18 25 Z" />
-            {/* long sides: wide and low enough to fully wrap the ears to the jaw */}
-            <path d="M16.3 23.5 Q14.6 34 17.8 43.5 L24.5 43.5 Q21.6 32 25 21.5 Q20 21.8 16.3 23.5 Z" />
-            <path d="M47.7 23.5 Q49.4 34 46.2 43.5 L39.5 43.5 Q42.4 32 39 21.5 Q44 21.8 47.7 23.5 Z" />
-            {/* centre-parted curtains */}
-            <path d="M31.6 15.8 Q25 17.4 23.4 24.6 Q27.6 20.6 31.6 20.2 Z" />
-            <path d="M32.4 15.8 Q39 17.4 40.6 24.6 Q36.4 20.6 32.4 20.2 Z" />
+          <>
+            {/* solid crown dome + two solid side flaps — simple closed shapes, no inner-notch seams */}
+            <path d="M17 25 Q16 14 32 13.5 Q48 14 47 25 Q47 27 45 28 L19 28 Q17 27 17 25 Z" fill={url("hairg")} />
+            <path d="M16.3 23 Q14.8 33 18 43.3 L25 43.3 Q23.5 30 25.5 21 Q20.5 21 16.3 23 Z" fill={url("hairg")} />
+            <path d="M47.7 23 Q49.2 33 46 43.3 L39 43.3 Q40.5 30 38.5 21 Q43.5 21 47.7 23 Z" fill={url("hairg")} />
+            {/* skin cutout restores the face on top — inner flap edges stay outside it, so hair still fully wraps the ears */}
+            <ellipse cx="32" cy="30" rx="11.4" ry="10.6" fill={url("skin")} />
+            <ellipse cx="23.2" cy="31.4" rx="2" ry="1.25" fill="#ff6f61" opacity="0.3" />
+            <ellipse cx="40.8" cy="31.4" rx="2" ry="1.25" fill="#ff6f61" opacity="0.3" />
+            {/* centre-parted curtains, overlapping down onto the rim */}
+            <path d="M31.6 15.8 Q25 17.4 23.4 24.6 Q27.6 20.6 31.6 20.2 Z" fill={url("hairg")} />
+            <path d="M32.4 15.8 Q39 17.4 40.6 24.6 Q36.4 20.6 32.4 20.2 Z" fill={url("hairg")} />
             <path d="M19 30 Q17.7 21 24 18" stroke={shade(hairC, 0.35)} strokeWidth="0.9" fill="none" opacity="0.7" strokeLinecap="round" />
             <path d="M45 29 Q46.3 21 40 18.4" stroke={shade(hairC, 0.35)} strokeWidth="0.8" fill="none" opacity="0.6" strokeLinecap="round" />
-          </g>
+          </>
         )}
 
         {/* ---------------- face ---------------- */}

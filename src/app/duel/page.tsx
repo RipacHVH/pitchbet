@@ -69,6 +69,32 @@ function GoalStepper({
   );
 }
 
+/** Live m:ss timer since the search began, with the matchmaking estimate. */
+function SearchTimer({ queuedAt, estimateSeconds }: { queuedAt: string; estimateSeconds: number }) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const elapsed = Math.max(0, Math.floor((now - Date.parse(queuedAt)) / 1000));
+  const mm = Math.floor(elapsed / 60);
+  const ss = `${elapsed % 60}`.padStart(2, "0");
+  const overdue = elapsed > estimateSeconds;
+
+  return (
+    <div className="mt-4">
+      <p className="font-mono text-4xl font-bold tabular-nums text-white">
+        {mm}:{ss}
+      </p>
+      <p className="mt-1 text-xs font-bold text-lilac-400">
+        {overdue ? "Any moment now…" : <>Estimated wait: ~{estimateSeconds}s</>}
+      </p>
+    </div>
+  );
+}
+
 function SealedEnvelope({ locked, name }: { locked: boolean; name: string }) {
   return (
     <div className="flex flex-col items-center gap-1 rounded-2xl border-2 border-dashed border-white/15 bg-night-800/60 px-4 py-3">
@@ -375,7 +401,8 @@ export default function DuelPage() {
           <div className="rounded-3xl border-2 border-lilac-400/40 bg-night-800/80 p-8 text-center">
             <p className="animate-pulse text-5xl">🔎</p>
             <h2 className="display mt-3 text-2xl text-white">SEARCHING FOR AN OPPONENT…</h2>
-            <p className="mt-2 text-sm text-lilac-300">
+            <SearchTimer queuedAt={duel.queuedAt} estimateSeconds={duel.estimatedWaitSeconds} />
+            <p className="mt-3 text-sm text-lilac-300">
               {duel.division.emoji} <span className="font-bold text-white">{duel.division.name}</span>{" "}
               · your <span className="font-mono font-bold text-gold-300">{duel.stake.toLocaleString()}</span>-coin
               entry is in. The moment another player readies up here, you&apos;re on.

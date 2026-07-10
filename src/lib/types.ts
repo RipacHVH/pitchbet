@@ -186,6 +186,8 @@ export interface DuelView {
   opponentLocked: boolean;
   result: "won" | "lost" | "split" | null;
   resolvedAt: string | null;
+  queuedAt: string;
+  estimatedWaitSeconds: number;
 }
 
 export interface DuelResponse {

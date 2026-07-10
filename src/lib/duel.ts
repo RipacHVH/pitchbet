@@ -64,6 +64,10 @@ export interface DuelView {
   opponentLocked: boolean;
   result: "won" | "lost" | "split" | null;
   resolvedAt: string | null;
+  /** When the search started (searching phase) — drives the elapsed timer. */
+  queuedAt: string;
+  /** Rough matchmaking estimate shown while searching, in seconds. */
+  estimatedWaitSeconds: number;
 }
 
 interface DuelJoinedRow extends DuelRow {
@@ -303,6 +307,10 @@ export async function getMyDuel(playerId: number): Promise<DuelView | null> {
     opponentLocked: theirs.selection !== null,
     result,
     resolvedAt: row.resolved_at,
+    queuedAt: row.created_at,
+    // A queue never outlasts the bot's patience, so promise a touch more
+    // than that and matchmaking always beats its own estimate.
+    estimatedWaitSeconds: Math.ceil(botMatchDelayMs(row.id) / 1000 / 15) * 15,
   };
 }
 

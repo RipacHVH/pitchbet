@@ -47,6 +47,8 @@ export function ManagerAvatar({ config, size = 40 }: { config: AvatarConfig; siz
   // Jersey trim flips light/dark depending on the shirt colour
   const trim = luminance(kit) > 0.62 ? shade(kit, -0.55) : "#f4f4f8";
   const isBasicKit = config.kit.startsWith("basic-");
+  // A halo floats above the head rather than sitting on it, so it doesn't flatten hair.
+  const wearingHat = !!config.head && config.head !== "head-halo";
 
   return (
     <svg
@@ -256,30 +258,38 @@ export function ManagerAvatar({ config, size = 40 }: { config: AvatarConfig; siz
         {config.hair === 2 && (
           <g fill={url("hairg")}>
             <path d="M18.2 26.6 Q17.6 15.1 32 14.6 Q46.4 15.1 45.8 26.6 Q45 20.6 32 19.8 Q19 20.6 18.2 26.6 Z" />
-            {/* chunky spikes rooted well inside the cap so they read as one mass */}
-            <path d="M19.4 20.5 Q17.6 12 23.4 16.7 Q21 17.9 19.4 20.5 Z" />
-            <path d="M23.6 17.7 Q24.9 9.3 30 15.6 Q26.7 15.9 23.6 17.7 Z" />
-            <path d="M29 15.6 Q31.6 7.2 36 15.4 Q32.6 15.7 29 15.6 Z" />
-            <path d="M35.3 15.7 Q40.3 8.8 41.7 17.3 Q38.4 15.9 35.3 15.7 Z" />
-            <path d="M41 18.2 Q46.4 13.2 44.8 21 Q42.7 19.4 41 18.2 Z" />
+            {/* chunky spikes rooted well inside the cap so they read as one mass — hidden under headwear (a real hat flattens them) so nothing pokes through the crown */}
+            {!wearingHat && (
+              <>
+                <path d="M19.4 20.5 Q17.6 12 23.4 16.7 Q21 17.9 19.4 20.5 Z" />
+                <path d="M23.6 17.7 Q24.9 9.3 30 15.6 Q26.7 15.9 23.6 17.7 Z" />
+                <path d="M29 15.6 Q31.6 7.2 36 15.4 Q32.6 15.7 29 15.6 Z" />
+                <path d="M35.3 15.7 Q40.3 8.8 41.7 17.3 Q38.4 15.9 35.3 15.7 Z" />
+                <path d="M41 18.2 Q46.4 13.2 44.8 21 Q42.7 19.4 41 18.2 Z" />
+              </>
+            )}
           </g>
         )}
         {config.hair === 3 && (
           <g fill={url("hairg")}>
             <path d="M18.2 26.6 Q17.6 15.1 32 14.6 Q46.4 15.1 45.8 26.6 Q45 20.6 32 19.8 Q19 20.6 18.2 26.6 Z" />
-            {/* puffs generously overlapping the cap and each other, including over the temples */}
-            <circle cx="19.8" cy="23.2" r="3.9" />
-            <circle cx="23" cy="18.3" r="4.6" />
-            <circle cx="30" cy="15.6" r="4.6" />
-            <circle cx="38" cy="16.4" r="4.6" />
-            <circle cx="44.2" cy="23.2" r="3.9" />
-            {/* forehead puffs sit lower, over the fringe line */}
-            <circle cx="26.3" cy="19.8" r="3.1" />
-            <circle cx="33.8" cy="19.3" r="3.3" />
-            <circle cx="40.2" cy="20.3" r="2.8" />
-            <circle cx="28.6" cy="14.6" r="1.1" fill={shade(hairC, 0.4)} opacity="0.8" />
-            <circle cx="22.4" cy="18.2" r="0.9" fill={shade(hairC, 0.4)} opacity="0.7" />
-            <circle cx="36.7" cy="15.6" r="0.9" fill={shade(hairC, 0.4)} opacity="0.7" />
+            {/* puffs generously overlapping the cap and each other, including over the temples — hidden under headwear so nothing pokes past the brim */}
+            {!wearingHat && (
+              <>
+                <circle cx="19.8" cy="23.2" r="3.9" />
+                <circle cx="23" cy="18.3" r="4.6" />
+                <circle cx="30" cy="15.6" r="4.6" />
+                <circle cx="38" cy="16.4" r="4.6" />
+                <circle cx="44.2" cy="23.2" r="3.9" />
+                {/* forehead puffs sit lower, over the fringe line */}
+                <circle cx="26.3" cy="19.8" r="3.1" />
+                <circle cx="33.8" cy="19.3" r="3.3" />
+                <circle cx="40.2" cy="20.3" r="2.8" />
+                <circle cx="28.6" cy="14.6" r="1.1" fill={shade(hairC, 0.4)} opacity="0.8" />
+                <circle cx="22.4" cy="18.2" r="0.9" fill={shade(hairC, 0.4)} opacity="0.7" />
+                <circle cx="36.7" cy="15.6" r="0.9" fill={shade(hairC, 0.4)} opacity="0.7" />
+              </>
+            )}
           </g>
         )}
         {config.hair === 4 && (
@@ -292,9 +302,13 @@ export function ManagerAvatar({ config, size = 40 }: { config: AvatarConfig; siz
             <ellipse cx="32" cy="30" rx="11.4" ry="10.6" fill={url("skin")} />
             <ellipse cx="23.2" cy="31.4" rx="2" ry="1.25" fill="#ff6f61" opacity="0.3" />
             <ellipse cx="40.8" cy="31.4" rx="2" ry="1.25" fill="#ff6f61" opacity="0.3" />
-            {/* centre-parted curtains, overlapping down onto the rim */}
-            <path d="M31.6 15.8 Q25 17.4 23.4 24.6 Q27.6 20.6 31.6 20.2 Z" fill={url("hairg")} />
-            <path d="M32.4 15.8 Q39 17.4 40.6 24.6 Q36.4 20.6 32.4 20.2 Z" fill={url("hairg")} />
+            {/* centre-parted curtains, overlapping down onto the rim — the top few millimetres sit under a hat's brim, so hide them when one's worn */}
+            {!wearingHat && (
+              <>
+                <path d="M31.6 15.8 Q25 17.4 23.4 24.6 Q27.6 20.6 31.6 20.2 Z" fill={url("hairg")} />
+                <path d="M32.4 15.8 Q39 17.4 40.6 24.6 Q36.4 20.6 32.4 20.2 Z" fill={url("hairg")} />
+              </>
+            )}
             <path d="M19 30 Q17.7 21 24 18" stroke={shade(hairC, 0.35)} strokeWidth="0.9" fill="none" opacity="0.7" strokeLinecap="round" />
             <path d="M45 29 Q46.3 21 40 18.4" stroke={shade(hairC, 0.35)} strokeWidth="0.8" fill="none" opacity="0.6" strokeLinecap="round" />
           </>

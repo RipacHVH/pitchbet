@@ -49,6 +49,15 @@ export function Hud({ pulse = false }: { pulse?: boolean }) {
     return () => document.removeEventListener("mousedown", onClick);
   }, [menuOpen]);
 
+  // Temporary testing faucet — remove alongside /api/dev/coins before launch.
+  const [granting, setGranting] = useState(false);
+  const grantCoins = async () => {
+    setGranting(true);
+    await fetch("/api/dev/coins", { method: "POST" });
+    setGranting(false);
+    await refresh();
+  };
+
   const logout = async () => {
     setLoggingOut(true);
     await fetch("/api/logout", { method: "POST" });
@@ -101,6 +110,17 @@ export function Hud({ pulse = false }: { pulse?: boolean }) {
             >
               <Coin />
               {balance === null ? "…" : Math.round(balance).toLocaleString()}
+              {joined && (
+                <button
+                  onClick={grantCoins}
+                  disabled={granting}
+                  title="Testing only: +1,000 coins"
+                  aria-label="Add 1,000 test coins"
+                  className="btn-press -mr-1 ml-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-gold-400 text-xs font-extrabold leading-none text-night-950 hover:bg-gold-300 disabled:opacity-50"
+                >
+                  +
+                </button>
+              )}
             </span>
 
             {!loaded ? (

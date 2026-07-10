@@ -251,12 +251,10 @@ export function ManagerAvatar({ config, size = 40 }: { config: AvatarConfig; siz
             {/* re-lay the blush the cutout just painted over */}
             <ellipse cx="23.2" cy="31.4" rx="2" ry="1.25" fill="#ff6f61" opacity="0.3" />
             <ellipse cx="40.8" cy="31.4" rx="2" ry="1.25" fill="#ff6f61" opacity="0.3" />
-            {/* side-swept fringe: one smooth crescent (top edge dips toward the brow, bottom edge stays high), peak shifted left so the left side reads longer and the right tapers short — sits on the rim, overlapping generously so it can't leave a gap */}
-            <path d="M19 21.5 Q25 24.4 33 22.4 Q39 19.9 45.5 20.6 Q31 18.4 19 21.5 Z" fill={url("hairg")} />
-            {/* combed texture strands following the sweep */}
-            <path d="M21.3 20.6 Q26 22 30.5 21" stroke={shade(hairC, 0.4)} strokeWidth="0.8" fill="none" opacity="0.55" strokeLinecap="round" />
-            <path d="M25.5 19.6 Q30.5 21.6 35.5 20.4" stroke={shade(hairC, 0.4)} strokeWidth="0.75" fill="none" opacity="0.5" strokeLinecap="round" />
-            <path d="M33 20.2 Q38.5 20.6 43.5 20.4" stroke={shade(hairC, -0.35)} strokeWidth="0.6" fill="none" opacity="0.4" strokeLinecap="round" />
+            {/* side-swept fringe: one smooth crescent, slightly fuller on the left and tapering shorter on the right — sits on the rim, overlapping generously so it can't leave a gap */}
+            <path d="M19.5 21.6 Q28 25 36 22.4 Q41 20.8 45 20.9 Q30 18.8 19.5 21.6 Z" fill={url("hairg")} />
+            {/* single soft highlight along the sweep */}
+            <path d="M22.5 19.4 Q29 21.4 36.5 19.9" stroke={shade(hairC, 0.4)} strokeWidth="0.9" fill="none" opacity="0.5" strokeLinecap="round" />
           </>
         )}
         {config.hair === 2 && (

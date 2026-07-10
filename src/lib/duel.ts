@@ -1,4 +1,4 @@
-import { db, withTx, type DuelRow, type FixtureRow, type Queryable } from "./db";
+import { db, getMeta, setMeta, withTx, type DuelRow, type FixtureRow, type Queryable } from "./db";
 
 /** Duels whose fixture never got a score within this window are voided (both refunded). */
 const VOID_AFTER_MS = 4 * 24 * 60 * 60_000;
@@ -572,6 +572,68 @@ export async function maybeRunBots(): Promise<void> {
       `UPDATE duels SET ${side}_selection = ?, ${side}_home_goals = ?, ${side}_away_goals = ?
        WHERE id = ? AND ${side}_selection IS NULL`,
       [call.selection, call.hg, call.ag, duel.id],
+    );
+  }
+}
+
+/* ---------------- The bot ladder ----------------
+   A ranked mode with three names on the board looks dead. Keep a roster of
+   bots spread across the tiers, and let their RP drift like they're playing
+   their own duels — each bot moves roughly every day or two. */
+
+const LADDER_BOT_TARGET = 18;
+const DRIFT_INTERVAL_MS = 12 * 60 * 60_000; // a pass at most twice a day
+/** Chance a given bot "played" since the last pass (~every 1-2 days each). */
+const DRIFT_PLAY_CHANCE = 0.55;
+
+/**
+ * Seed the bot roster if it's thin, then (at most once per interval) walk
+ * their RP as if they'd been duelling: mostly climbs, the odd bad night.
+ * Piggybacks on leaderboard loads — no scheduler needed.
+ */
+export async function driftBotLadder(): Promise<void> {
+  const count = await db().one<{ n: string }>("SELECT COUNT(*) AS n FROM players WHERE is_bot");
+  const missing = LADDER_BOT_TARGET - Number(count?.n ?? 0);
+  if (missing > 0) {
+    await withTx(async (tx) => {
+      for (let i = 0; i < missing; i++) {
+        // Skewed toward the lower tiers, the odd high-flyer — like a real ladder.
+        const rp = Math.floor(1500 * Math.pow(Math.random(), 2.4));
+        const wins = Math.max(0, Math.round(rp / 28 + (Math.random() * 6 - 3)));
+        for (let attempt = 0; attempt < 10; attempt++) {
+          const base = BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)];
+          const name = attempt === 0 ? base : `${base}${Math.floor(Math.random() * 90) + 10}`;
+          const taken = await tx.one("SELECT 1 FROM players WHERE lower(username) = lower(?)", [name]);
+          if (taken) continue;
+          await tx.exec(
+            `INSERT INTO players (username, balance, is_bot, avatar, rp, duel_wins)
+             VALUES (?, ?, true, ?, ?, ?)`,
+            [name, 1_000_000, randomBotAvatar(), rp, wins],
+          );
+          break;
+        }
+      }
+    });
+  }
+
+  const last = await getMeta("last_bot_drift");
+  if (last && Date.now() - Date.parse(last) < DRIFT_INTERVAL_MS) return;
+  // Claim the pass up front so concurrent requests don't double-drift.
+  await setMeta("last_bot_drift", new Date().toISOString());
+
+  const bots = await db().many<{ id: number; rp: number }>(
+    "SELECT id, rp FROM players WHERE is_bot",
+  );
+  for (const bot of bots) {
+    if (Math.random() > DRIFT_PLAY_CHANCE) continue; // didn't play today
+    // Winning nights outnumber losing ones, so the board keeps rising.
+    const won = Math.random() < 0.72;
+    const delta = won
+      ? 15 + Math.floor(Math.random() * 50) // +15..+64
+      : -(10 + Math.floor(Math.random() * 30)); // -10..-39
+    await db().exec(
+      `UPDATE players SET rp = GREATEST(0, rp + ?), duel_wins = duel_wins + ? WHERE id = ?`,
+      [delta, won ? 1 : 0, bot.id],
     );
   }
 }

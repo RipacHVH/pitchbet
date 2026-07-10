@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { currentPlayer } from "@/lib/identity";
+import { driftBotLadder } from "@/lib/duel";
 import { getOrCreateActiveSeason, rotateSeasonIfDue } from "@/lib/seasons";
 
 export async function GET() {
   const player = await currentPlayer();
   await rotateSeasonIfDue();
   const season = await getOrCreateActiveSeason();
+  await driftBotLadder();
 
   const rows = await db().many<{
     id: number;
@@ -18,7 +20,7 @@ export async function GET() {
     avatar: string | null;
   }>(
     `SELECT id, username, rp, arena_wins, challenge_wins, season_wins, avatar FROM players
-     WHERE token IS NOT NULL OR password_hash IS NOT NULL
+     WHERE token IS NOT NULL OR password_hash IS NOT NULL OR is_bot
      ORDER BY rp DESC, arena_wins DESC, created_at ASC
      LIMIT 50`,
   );

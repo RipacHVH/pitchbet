@@ -42,27 +42,6 @@ export interface ArenaRevealItem {
   won: boolean;
 }
 
-/** The one open *public* arena, creating it from the next upcoming matches if needed. */
-export async function getOrCreateOpenArena(): Promise<ArenaRow | null> {
-  const open = await db().one<ArenaRow>(
-    "SELECT * FROM arenas WHERE status = 'open' AND is_private = false LIMIT 1",
-  );
-  if (open) return open;
-
-  const slate = await nextSlate();
-  if (slate.length < 2) return null;
-
-  return withTx(async (tx) => {
-    const created = await tx.one<{ id: number }>("INSERT INTO arenas (name) VALUES ('') RETURNING id");
-    const id = created!.id;
-    await tx.exec("UPDATE arenas SET name = ? WHERE id = ?", [`Matchday #${id}`, id]);
-    for (const f of slate) {
-      await tx.exec("INSERT INTO arena_fixtures (arena_id, fixture_id) VALUES (?, ?)", [id, f.id]);
-    }
-    return (await tx.one<ArenaRow>("SELECT * FROM arenas WHERE id = ?", [id]))!;
-  });
-}
-
 async function nextSlate(): Promise<{ id: string }[]> {
   return db().many<{ id: string }>(
     `SELECT id FROM fixtures
@@ -256,8 +235,9 @@ export async function placeArenaPick(
 }
 
 /**
- * Score decided picks (right: +odds x 10 RP, wrong: same amount lost, global
- * RP floored at 0), then finalize any arena whose whole slate is resolved.
+ * Score decided picks (right: +odds x 10 league points, wrong: same amount
+ * lost — global ranked RP is untouched; that ladder belongs to the
+ * Showdown), then finalize any arena whose whole slate is resolved.
  *
  * Settlement is global, but callerId scopes the returned reveal list to what
  * that specific player should see on their result-reveal screen.
@@ -291,14 +271,11 @@ export async function settleArenaRound(
           delta,
           pick.id,
         ]);
+        // League points only — the global RP ladder is the Showdown's now.
         await tx.exec(
           "UPDATE arena_entries SET points = points + ? WHERE arena_id = ? AND player_id = ?",
           [delta, pick.arena_id, pick.player_id],
         );
-        await tx.exec("UPDATE players SET rp = GREATEST(0, rp + ?) WHERE id = ?", [
-          delta,
-          pick.player_id,
-        ]);
         if (callerId !== undefined && pick.player_id === callerId) {
           reveal.push({
             fixtureId: pick.fixture_id,

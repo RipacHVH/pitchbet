@@ -1,12 +1,39 @@
 import { db, withTx, type DuelRow, type FixtureRow, type Queryable } from "./db";
 
-/** Fixed ante — both players pay it in, winner takes the pot. */
-export const DUEL_STAKE = 100;
-
 /** Duels whose fixture never got a score within this window are voided (both refunded). */
 const VOID_AFTER_MS = 4 * 24 * 60 * 60_000;
 /** Don't serve a clash that kicks off sooner than this — both players need time to pick. */
 const MIN_LEAD_MS = 10 * 60_000;
+/** Prefer the biggest clash among games kicking off within this window. */
+const BIG_GAME_WINDOW_MS = 48 * 60 * 60_000;
+
+/**
+ * Ranked divisions. Entry is escrowed coins (winner takes the pot); minRp
+ * gates entry by career rank; rpWin/rpLoss is the ladder swing on a decided
+ * duel. Names and thresholds mirror the career TIERS in ranks.ts.
+ */
+export interface DuelDivision {
+  id: string;
+  name: string;
+  emoji: string;
+  entry: number;
+  minRp: number;
+  rpWin: number;
+  rpLoss: number;
+}
+
+export const DIVISIONS: DuelDivision[] = [
+  { id: "sunday", name: "Sunday League", emoji: "🥾", entry: 100, minRp: 0, rpWin: 20, rpLoss: 10 },
+  { id: "pub", name: "Pub Team", emoji: "🍺", entry: 250, minRp: 75, rpWin: 35, rpLoss: 20 },
+  { id: "semipro", name: "Semi-Pro", emoji: "🏃", entry: 500, minRp: 200, rpWin: 50, rpLoss: 30 },
+  { id: "firstteam", name: "First Team", emoji: "⭐", entry: 1000, minRp: 400, rpWin: 70, rpLoss: 45 },
+  { id: "legend", name: "Club Legend", emoji: "🏆", entry: 2500, minRp: 750, rpWin: 100, rpLoss: 65 },
+  { id: "ballondor", name: "Ballon d'Or", emoji: "👑", entry: 5000, minRp: 1200, rpWin: 150, rpLoss: 100 },
+];
+
+export function divisionById(id: string): DuelDivision | undefined {
+  return DIVISIONS.find((d) => d.id === id);
+}
 
 export type DuelPhase =
   | "searching" // waiting for an opponent
@@ -26,6 +53,7 @@ export interface DuelOpponent {
 export interface DuelView {
   id: number;
   phase: DuelPhase;
+  division: DuelDivision;
   stake: number;
   pot: number;
   fixture: FixtureRow | null;
@@ -45,17 +73,28 @@ interface DuelJoinedRow extends DuelRow {
 }
 
 /**
- * The next big clash: among upcoming fixtures with odds, the one whose
- * home/away odds are tightest — the most evenly-matched game on the slate
- * (kickoff soonest as the tiebreak). That's the match both duellists get.
+ * The next big clash: the tightest-odds (most evenly matched) game among
+ * fixtures kicking off in the next 48 hours — "next" matters as much as
+ * "big", so a coin-flip clash a week away never outranks tonight's game.
+ * If nothing kicks off inside the window, fall back to the soonest fixture.
  */
 async function nextBigGame(tx: Queryable): Promise<FixtureRow | undefined> {
+  const from = new Date(Date.now() + MIN_LEAD_MS).toISOString();
+  const inWindow = await tx.one<FixtureRow>(
+    `SELECT * FROM fixtures
+     WHERE completed = 0 AND commence_time > ? AND commence_time < ?
+       AND home_odds IS NOT NULL AND away_odds IS NOT NULL
+     ORDER BY ABS(home_odds - away_odds) ASC, commence_time ASC
+     LIMIT 1`,
+    [from, new Date(Date.now() + BIG_GAME_WINDOW_MS).toISOString()],
+  );
+  if (inWindow) return inWindow;
   return tx.one<FixtureRow>(
     `SELECT * FROM fixtures
      WHERE completed = 0 AND commence_time > ? AND home_odds IS NOT NULL AND away_odds IS NOT NULL
-     ORDER BY ABS(home_odds - away_odds) ASC, commence_time ASC
+     ORDER BY commence_time ASC
      LIMIT 1`,
-    [new Date(Date.now() + MIN_LEAD_MS).toISOString()],
+    [from],
   );
 }
 
@@ -70,45 +109,53 @@ async function activeDuel(playerId: number, tx?: Queryable): Promise<DuelRow | u
 }
 
 /**
- * Ready up: escrow the ante, then either join the oldest searching duel
- * (FIFO) or open a new one and wait. Matching and escrow are one
- * transaction, so two players can't grab the same slot.
+ * Ready up in a division: escrow the entry fee, then either join the oldest
+ * searching duel in that division (FIFO) or open a new one and wait.
+ * Matching and escrow are one transaction, so two players can't grab the
+ * same slot.
  */
-export async function readyUp(playerId: number): Promise<{ error?: string; status?: number }> {
+export async function readyUp(
+  playerId: number,
+  divisionId: string,
+): Promise<{ error?: string; status?: number }> {
+  const division = divisionById(divisionId);
+  if (!division) return { error: "No such division.", status: 400 };
+
   return withTx(async (tx) => {
     const existing = await activeDuel(playerId, tx);
     if (existing) return {}; // already queued or in a duel — the GET shows it
 
+    const player = await tx.one<{ rp: number }>("SELECT rp FROM players WHERE id = ?", [playerId]);
+    if ((player?.rp ?? 0) < division.minRp) {
+      return {
+        error: `${division.name} needs ${division.minRp} RP — climb the ladder first.`,
+        status: 403,
+      };
+    }
+
     const debit = await tx.exec(
       "UPDATE players SET balance = balance - ? WHERE id = ? AND balance >= ?",
-      [DUEL_STAKE, playerId, DUEL_STAKE],
+      [division.entry, playerId, division.entry],
     );
     if (debit.rowCount === 0) {
-      return { error: `You need ${DUEL_STAKE} coins to ante up.`, status: 409 };
+      return { error: `You need ${division.entry} coins to enter ${division.name}.`, status: 409 };
     }
 
     // FOR UPDATE SKIP LOCKED: concurrent ready-ups each claim a different row.
     const open = await tx.one<DuelRow>(
-      `SELECT * FROM duels WHERE status = 'searching' AND p1_id != ?
+      `SELECT * FROM duels WHERE status = 'searching' AND tier = ? AND p1_id != ?
        ORDER BY created_at ASC LIMIT 1 FOR UPDATE SKIP LOCKED`,
-      [playerId],
+      [division.id, playerId],
     );
 
-    if (!open) {
-      await tx.exec("INSERT INTO duels (status, stake, p1_id) VALUES ('searching', ?, ?)", [
-        DUEL_STAKE,
-        playerId,
-      ]);
-      return {};
-    }
+    const fixture = open ? await nextBigGame(tx) : undefined;
 
-    const fixture = await nextBigGame(tx);
-    if (!fixture) {
-      // No servable match: leave them queued rather than eating the ante.
-      await tx.exec("INSERT INTO duels (status, stake, p1_id) VALUES ('searching', ?, ?)", [
-        DUEL_STAKE,
-        playerId,
-      ]);
+    if (!open || !fixture) {
+      // Nobody to fight (or no servable match yet): queue up and wait.
+      await tx.exec(
+        "INSERT INTO duels (status, tier, stake, p1_id) VALUES ('searching', ?, ?, ?)",
+        [division.id, division.entry, playerId],
+      );
       return {};
     }
 
@@ -120,17 +167,17 @@ export async function readyUp(playerId: number): Promise<{ error?: string; statu
   });
 }
 
-/** Leave the queue (only while still unmatched) and take the ante back. */
+/** Leave the queue (only while still unmatched) and take the entry back. */
 export async function cancelSearch(playerId: number): Promise<{ error?: string; status?: number }> {
   return withTx(async (tx) => {
-    const gone = await tx.exec(
-      `DELETE FROM duels WHERE p1_id = ? AND status = 'searching'`,
+    const gone = await tx.one<{ stake: number }>(
+      `DELETE FROM duels WHERE p1_id = ? AND status = 'searching' RETURNING stake`,
       [playerId],
     );
-    if (gone.rowCount === 0) {
+    if (!gone) {
       return { error: "No open search to cancel — you may already be matched.", status: 409 };
     }
-    await tx.exec("UPDATE players SET balance = balance + ? WHERE id = ?", [DUEL_STAKE, playerId]);
+    await tx.exec("UPDATE players SET balance = balance + ? WHERE id = ?", [gone.stake, playerId]);
     return {};
   });
 }
@@ -238,6 +285,7 @@ export async function getMyDuel(playerId: number): Promise<DuelView | null> {
   return {
     id: row.id,
     phase,
+    division: divisionById(row.tier) ?? DIVISIONS[0],
     stake: row.stake,
     pot: row.stake * 2,
     fixture: fixture ?? null,
@@ -304,14 +352,20 @@ export async function resolveDuels(): Promise<number> {
       }
 
       if (winnerId === null) {
-        // Dead heat — pot splits back to both.
+        // Dead heat — pot splits back to both, ladder untouched.
         await tx.exec("UPDATE players SET balance = balance + ? WHERE id = ?", [duel.stake, duel.p1_id]);
         await tx.exec("UPDATE players SET balance = balance + ? WHERE id = ?", [duel.stake, duel.p2_id]);
       } else {
+        const division = divisionById(duel.tier) ?? DIVISIONS[0];
+        const loserId = winnerId === duel.p1_id ? duel.p2_id : duel.p1_id;
         await tx.exec(
-          "UPDATE players SET balance = balance + ?, duel_wins = duel_wins + 1 WHERE id = ?",
-          [duel.stake * 2, winnerId],
+          "UPDATE players SET balance = balance + ?, duel_wins = duel_wins + 1, rp = rp + ? WHERE id = ?",
+          [duel.stake * 2, division.rpWin, winnerId],
         );
+        await tx.exec("UPDATE players SET rp = GREATEST(0, rp - ?) WHERE id = ?", [
+          division.rpLoss,
+          loserId,
+        ]);
       }
       await tx.exec(
         "UPDATE duels SET status = 'completed', winner_id = ?, resolved_at = now() WHERE id = ?",

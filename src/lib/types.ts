@@ -115,10 +115,7 @@ export interface MyArenaSummary {
 }
 
 export interface ArenaResponse {
-  current: ArenaInfo | null;
-  lastSettled: ArenaInfo | null;
   me: { id: number; username: string; rp: number } | null;
-  challenges: Challenge[];
   myLeagues: MyArenaSummary[];
 }
 
@@ -166,9 +163,20 @@ export interface DuelPick {
   awayGoals: number;
 }
 
+export interface DuelDivision {
+  id: string;
+  name: string;
+  emoji: string;
+  entry: number;
+  minRp: number;
+  rpWin: number;
+  rpLoss: number;
+}
+
 export interface DuelView {
   id: number;
   phase: DuelPhase;
+  division: DuelDivision;
   stake: number;
   pot: number;
   fixture: Fixture | null;
@@ -183,8 +191,9 @@ export interface DuelView {
 export interface DuelResponse {
   duel: DuelView | null;
   record: { wins: number; played: number } | null;
-  stake: number;
-  me?: { id: number; username: string; balance: number };
+  divisions: DuelDivision[];
+  tiers: { name: string; min: number; color: string }[];
+  me?: { id: number; username: string; balance: number; rp: number; duelWins: number };
 }
 
 export interface CareerRevealItem {

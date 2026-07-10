@@ -96,8 +96,8 @@ export function Hud({ pulse = false }: { pulse?: boolean }) {
               Fut<span className="text-gold-400">caster</span>
             </Link>
             {tab("/", "Play")}
-            {tab("/arena", "Arena")}
             {tab("/duel", "Showdown")}
+            {tab("/arena", "Friends")}
             {tab("/shop", "Shop")}
             {tab("/bets", `Tickets${openBets > 0 ? ` · ${openBets}` : ""}`)}
           </div>

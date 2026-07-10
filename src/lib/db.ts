@@ -215,6 +215,8 @@ export function ensureSchema(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_duels_searching ON duels (status, created_at);
       CREATE INDEX IF NOT EXISTS idx_duels_players ON duels (p1_id, p2_id, status);
       ALTER TABLE players ADD COLUMN IF NOT EXISTS duel_wins INTEGER NOT NULL DEFAULT 0;
+      -- Ranked divisions: which queue the duel belongs to.
+      ALTER TABLE duels ADD COLUMN IF NOT EXISTS tier TEXT NOT NULL DEFAULT 'sunday';
 
       CREATE TABLE IF NOT EXISTS player_items (
         player_id INTEGER NOT NULL REFERENCES players(id),
@@ -361,6 +363,7 @@ export interface ChallengeRow {
 export interface DuelRow {
   id: number;
   status: "searching" | "live" | "completed" | "void";
+  tier: string;
   stake: number;
   fixture_id: string | null;
   p1_id: number;

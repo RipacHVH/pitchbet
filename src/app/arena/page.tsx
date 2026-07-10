@@ -17,8 +17,6 @@ import type {
   ArenaStanding,
   Challenge,
   Fixture,
-  HallOfFameSeason,
-  LeaderboardResponse,
   MyArenaSummary,
   Selection,
   SettleSummary,
@@ -36,26 +34,18 @@ function pointsLabel(points: number): string {
 export default function ArenaPage() {
   const { me, loaded: meLoaded, refresh: refreshMe } = useMe();
   const [data, setData] = useState<ArenaResponse | null>(null);
-  const [board, setBoard] = useState<LeaderboardResponse | null>(null);
-  const [hallOfFame, setHallOfFame] = useState<HallOfFameSeason[]>([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [reveal, setReveal] = useState<RevealItem[] | null>(null);
 
-  // null = viewing the public Matchday; otherwise the id of a private league.
+  // The private league being viewed, if any.
   const [viewingArenaId, setViewingArenaId] = useState<number | null>(null);
   const [viewedArena, setViewedArena] = useState<SingleArenaResponse | null>(null);
   const [freshInviteCode, setFreshInviteCode] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const [arenaRes, boardRes, hofRes] = await Promise.all([
-      fetch("/api/arena"),
-      fetch("/api/leaderboard"),
-      fetch("/api/seasons/hall-of-fame"),
-    ]);
+    const arenaRes = await fetch("/api/arena");
     if (arenaRes.ok) setData(await arenaRes.json());
-    if (boardRes.ok) setBoard(await boardRes.json());
-    if (hofRes.ok) setHallOfFame((await hofRes.json()).seasons);
   }, []);
 
   const loadViewedArena = useCallback(async (id: number) => {
@@ -132,7 +122,7 @@ export default function ArenaPage() {
         kind: "ok",
         text:
           s.arenasFinalized > 0
-            ? "🏁 Full time! The table is final — rank points are in the books."
+            ? "🏁 Full time! The table is final — the league table is in the books."
             : "The table updates as matches finish. No new final whistles yet.",
       });
     }
@@ -199,8 +189,6 @@ export default function ArenaPage() {
   };
 
   const joined = me?.joined === true;
-  const current = data?.current ?? null;
-  const showSettled = !current && data?.lastSettled ? data.lastSettled : null;
 
   return (
     <div className="min-h-dvh pb-16">
@@ -209,17 +197,12 @@ export default function ArenaPage() {
       <main className="mx-auto max-w-2xl px-4">
         <section className="pb-5 pt-8 text-center">
           <h1 className="display text-5xl leading-none text-white drop-shadow-[0_4px_0_rgba(0,0,0,.5)]">
-            The <span className="text-gold-400">Arena</span>
+            Friends <span className="text-gold-400">Leagues</span>
           </h1>
           <p className="mt-2 font-semibold text-lilac-300">
-            No coins here. Call it right, the odds become rank points. Call it wrong, they&apos;re gone.
+            Make a league, share the code, and out-call your mates over a slate of real matches.
+            Bragging rights only — the ranked ladder lives in the Showdown.
           </p>
-          {joined && me && (
-            <div className="mt-3 flex items-center justify-center gap-2">
-              <span className="font-bold text-white">{me.username}</span>
-              <RankBadge rp={me.rp ?? 0} showRp />
-            </div>
-          )}
         </section>
 
         {notice && (
@@ -274,35 +257,20 @@ export default function ArenaPage() {
               ) : (
                 <SettledArena info={viewedArena.arena} meId={data.me?.id ?? null} />
               )
-            ) : current ? (
-              <ArenaBoard
-                info={current}
-                meId={data.me?.id ?? null}
-                challenges={data.challenges}
-                busy={busy}
-                onEnter={() => enterArena(current.arena.id)}
-                onPickLocked={refreshAll}
-                onCheckResults={checkResults}
-                onSendChallenge={(username) => sendChallenge(current.arena.id, username)}
-                onRespondChallenge={respondChallenge}
-              />
-            ) : showSettled ? (
-              <>
-                <SettledArena info={showSettled} meId={data.me?.id ?? null} />
-                <p className="mt-4 text-center text-sm font-bold text-lilac-300">
-                  A new arena opens as soon as the next matches get odds.
-                </p>
-              </>
             ) : (
-              <p className="py-16 text-center font-bold text-lilac-400">
-                No arena right now — needs at least two upcoming matches with odds.
-              </p>
+              <div className="rounded-3xl border-2 border-gold-600/40 bg-night-800/80 p-8 text-center">
+                <p className="text-5xl">🏟️</p>
+                <h2 className="display mt-2 text-2xl text-white">YOUR LEAGUE, YOUR RULES</h2>
+                <p className="mx-auto mt-2 max-w-md text-sm text-lilac-300">
+                  Every league gets a slate of the next real matches. One pick per game — call it
+                  right and the odds become league points, call it wrong and they&apos;re gone.
+                  Top of the table takes the crown. Create one and share the invite code, or join
+                  a mate&apos;s with theirs.
+                </p>
+              </div>
             )}
           </>
         )}
-
-        {board && board.players.length > 0 && <WorldRankings board={board} />}
-        <HallOfFame seasons={hallOfFame} />
       </main>
 
       {reveal && <ResultReveal items={reveal} onDone={() => setReveal(null)} />}
@@ -362,7 +330,7 @@ function MyLeagues({
               onClick={onBack}
               className="btn-press rounded-xl border-b-night-950 bg-night-600 px-3 py-1.5 text-sm font-extrabold text-lilac-200 hover:bg-night-500"
             >
-              ← Matchday
+              ← All leagues
             </button>
           )}
           <button
@@ -456,7 +424,7 @@ function MyLeagues({
                   l.points >= 0 ? "text-gold-300" : "text-danger-300"
                 }`}
               >
-                {pointsLabel(l.points)} RP
+                {pointsLabel(l.points)} pts
               </span>
               <button
                 onClick={() => onView(l.id)}
@@ -530,7 +498,7 @@ function ArenaBoard({
                 info.entry!.points >= 0 ? "text-gold-300" : "text-danger-300"
               }`}
             >
-              {pointsLabel(info.entry!.points)} RP
+              {pointsLabel(info.entry!.points)} pts
             </p>
           </div>
         ) : (
@@ -824,7 +792,7 @@ function SlateCard({
             {pickLabel(myBet.selection)}{" "}
             <span className="font-mono text-gold-300">@{myBet.odds.toFixed(2)}</span>
             <span className="ml-2 font-mono text-xs text-lilac-300">
-              ±{rpForOdds(myBet.odds)} RP riding
+              ±{rpForOdds(myBet.odds)} pts riding
             </span>
           </p>
           <span
@@ -842,7 +810,7 @@ function SlateCard({
               ? "Locked"
               : myBet.status === "void"
                 ? "Void"
-                : `${pointsLabel(myBet.rp_delta ?? 0)} RP`}
+                : `${pointsLabel(myBet.rp_delta ?? 0)} pts`}
           </span>
         </div>
       ) : !entered ? (
@@ -873,7 +841,7 @@ function SlateCard({
                     {pickLabel(s)}
                   </span>
                   <span className="font-mono text-base font-bold">
-                    {odds ? `±${rpForOdds(odds)} RP` : "–"}
+                    {odds ? `±${rpForOdds(odds)} pts` : "–"}
                   </span>
                 </button>
               );
@@ -884,9 +852,9 @@ function SlateCard({
             <div className="pop-in mt-3 flex items-center justify-between gap-2 rounded-2xl border-2 border-gold-600/40 bg-night-800 px-3 py-2">
               <p className="text-xs font-bold text-lilac-200">
                 {pickLabel(sel)} right{" "}
-                <span className="font-mono text-turf-300">+{rpForOdds(oddsFor(sel)!)} RP</span>
+                <span className="font-mono text-turf-300">+{rpForOdds(oddsFor(sel)!)} pts</span>
                 {" · "}wrong{" "}
-                <span className="font-mono text-danger-300">−{rpForOdds(oddsFor(sel)!)} RP</span>
+                <span className="font-mono text-danger-300">−{rpForOdds(oddsFor(sel)!)} pts</span>
               </p>
               <button
                 onClick={lock}
@@ -947,7 +915,7 @@ function StandingsTable({
                   s.points >= 0 ? "text-gold-300" : "text-danger-300"
                 }`}
               >
-                {pointsLabel(s.points)} RP
+                {pointsLabel(s.points)} pts
               </p>
               <p className="text-[10px] font-bold text-lilac-400">
                 {live ? `${s.picks} pick${s.picks === 1 ? "" : "s"}` : "final"}
@@ -986,7 +954,7 @@ function SettledArena({ info, meId }: { info: ArenaInfo; meId: number | null }) 
                     s.points >= 0 ? "text-gold-300" : "text-danger-300"
                   }`}
                 >
-                  {pointsLabel(s.points)} RP
+                  {pointsLabel(s.points)} pts
                 </p>
                 <div
                   className={`w-full rounded-t-xl border-2 border-b-0 ${heights[rank] ?? "h-14"} ${
@@ -1005,89 +973,5 @@ function SettledArena({ info, meId }: { info: ArenaInfo; meId: number | null }) 
 
       <StandingsTable standings={info.standings} meId={meId} live={false} />
     </>
-  );
-}
-
-/* ---------------- Global ladder ---------------- */
-
-function WorldRankings({ board }: { board: LeaderboardResponse }) {
-  return (
-    <section className="mt-10">
-      <div className="mb-3 flex items-baseline justify-between">
-        <h2 className="display text-lg text-white">World rankings</h2>
-        <p className="text-[11px] font-bold text-lilac-400">
-          {board.season.name} · <Countdown iso={board.season.endsAt} prefix="ends in" />
-        </p>
-      </div>
-      <ul className="flex flex-col gap-1.5">
-        {board.players.map((p, i) => (
-          <li
-            key={p.id}
-            className={`flex items-center gap-3 rounded-2xl border-2 px-3 py-2 ${
-              p.id === board.meId ? "border-gold-600/70 bg-night-600" : "border-white/10 bg-night-800/80"
-            }`}
-          >
-            <span className="display w-7 text-center text-lilac-300">{i + 1}</span>
-            <ManagerAvatar config={parseAvatar(p.avatar)} size={32} />
-            <p className="min-w-0 flex-1 truncate font-bold text-white">
-              {p.username}
-              {p.id === board.meId && (
-                <span className="ml-1 text-xs font-extrabold text-gold-300">(you)</span>
-              )}
-              {p.arena_wins > 0 && (
-                <span className="ml-2 text-xs font-bold text-lilac-300">🏆 {p.arena_wins}</span>
-              )}
-              {p.challenge_wins > 0 && (
-                <span className="ml-2 text-xs font-bold text-lilac-300">⚔️ {p.challenge_wins}</span>
-              )}
-              {p.season_wins > 0 && (
-                <span className="ml-2 text-xs font-bold text-lilac-300">🎖️ {p.season_wins}</span>
-              )}
-            </p>
-            <div className="flex items-center gap-2">
-              <RankBadge rp={p.rp} />
-              <span className="w-14 text-right font-mono text-sm font-bold text-lilac-200">
-                {p.rp} RP
-              </span>
-            </div>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-/* ---------------- Hall of fame: past seasons ---------------- */
-
-const MEDAL = ["🥇", "🥈", "🥉"];
-
-function HallOfFame({ seasons }: { seasons: HallOfFameSeason[] }) {
-  if (seasons.length === 0) return null;
-  return (
-    <section className="mt-10">
-      <h2 className="display mb-3 text-lg text-white">Hall of fame</h2>
-      <ul className="flex flex-col gap-2">
-        {seasons.map((s) => (
-          <li
-            key={s.id}
-            className="rounded-2xl border-2 border-white/10 bg-night-800/80 px-4 py-3"
-          >
-            <p className="mb-1.5 text-xs font-extrabold uppercase tracking-widest text-lilac-400">
-              {s.name}
-            </p>
-            <div className="flex flex-col gap-1">
-              {s.top.map((t) => (
-                <p key={t.finalRank} className="flex items-center gap-2 text-sm font-bold text-white">
-                  <span>{MEDAL[t.finalRank - 1] ?? "🎖️"}</span>
-                  <span className="min-w-0 flex-1 truncate">{t.username}</span>
-                  <span className="font-mono text-gold-300">{t.finalRp} RP</span>
-                  <span className="text-[10px] font-bold text-lilac-400">{t.tier}</span>
-                </p>
-              ))}
-            </div>
-          </li>
-        ))}
-      </ul>
-    </section>
   );
 }

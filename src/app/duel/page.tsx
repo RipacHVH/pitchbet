@@ -6,9 +6,18 @@ import { TeamBadge } from "@/components/TeamBadge";
 import { Countdown } from "@/components/Countdown";
 import { JoinGate } from "@/components/JoinGate";
 import { ManagerAvatar } from "@/components/ManagerAvatar";
+import { RankBadge } from "@/components/RankBadge";
+import { HallOfFame, WorldRankings } from "@/components/RankedBoards";
 import { parseAvatar, DEFAULT_AVATAR } from "@/lib/avatar";
 import { useMe } from "@/lib/MeContext";
-import type { DuelResponse, DuelView, Selection } from "@/lib/types";
+import type {
+  DuelDivision,
+  DuelResponse,
+  DuelView,
+  HallOfFameSeason,
+  LeaderboardResponse,
+  Selection,
+} from "@/lib/types";
 
 const SEARCH_POLL_MS = 3_000;
 const IDLE_POLL_MS = 20_000;
@@ -71,9 +80,58 @@ function SealedEnvelope({ locked, name }: { locked: boolean; name: string }) {
   );
 }
 
+function DivisionCard({
+  division,
+  myRp,
+  balance,
+  busy,
+  onReady,
+}: {
+  division: DuelDivision;
+  myRp: number;
+  balance: number;
+  busy: boolean;
+  onReady: () => void;
+}) {
+  const rankLocked = myRp < division.minRp;
+  const broke = !rankLocked && balance < division.entry;
+  return (
+    <div
+      className={`flex items-center gap-3 rounded-2xl border-2 p-3 ${
+        rankLocked ? "border-white/10 bg-night-900/60 opacity-60" : "border-gold-600/40 bg-night-800/80"
+      }`}
+    >
+      <span className="text-3xl">{division.emoji}</span>
+      <div className="min-w-0 flex-1">
+        <p className="font-extrabold text-white">{division.name}</p>
+        <p className="text-[11px] font-bold text-lilac-400">
+          <span className="font-mono text-gold-300">{division.entry.toLocaleString()}</span> coins ·{" "}
+          <span className="font-mono text-turf-300">+{division.rpWin}</span>/
+          <span className="font-mono text-danger-300">−{division.rpLoss}</span> RP
+          {division.minRp > 0 && <> · needs {division.minRp} RP</>}
+        </p>
+      </div>
+      {rankLocked ? (
+        <span className="stamp shrink-0 text-[10px] text-lilac-300">🔒 {division.minRp} RP</span>
+      ) : (
+        <button
+          onClick={onReady}
+          disabled={busy || broke}
+          title={broke ? `You need ${division.entry} coins` : undefined}
+          className="btn-press shrink-0 rounded-xl border-b-gold-800 bg-gold-400 px-4 py-2 text-sm font-black text-night-950 hover:bg-gold-300 disabled:opacity-40"
+        >
+          {broke ? "Low coins" : "Ready up"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function DuelPage() {
   const { me, loaded: meLoaded, refresh: refreshMe } = useMe();
   const [data, setData] = useState<DuelResponse | null>(null);
+  const [board, setBoard] = useState<LeaderboardResponse | null>(null);
+  const [hallOfFame, setHallOfFame] = useState<HallOfFameSeason[]>([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
@@ -91,9 +149,19 @@ export default function DuelPage() {
     if (res.ok) setData(await res.json());
   }, []);
 
+  const loadBoards = useCallback(async () => {
+    const [boardRes, hofRes] = await Promise.all([
+      fetch("/api/leaderboard"),
+      fetch("/api/seasons/hall-of-fame"),
+    ]);
+    if (boardRes.ok) setBoard(await boardRes.json());
+    if (hofRes.ok) setHallOfFame((await hofRes.json()).seasons);
+  }, []);
+
   // Poll fast while searching or waiting on the opponent's seal; slow otherwise.
   useEffect(() => {
     load();
+    loadBoards();
     let timer: ReturnType<typeof setTimeout>;
     const tick = async () => {
       await load();
@@ -102,7 +170,7 @@ export default function DuelPage() {
     };
     timer = setTimeout(tick, SEARCH_POLL_MS);
     return () => clearTimeout(timer);
-  }, [load]);
+  }, [load, loadBoards]);
 
   // Keep the scoreline consistent with the call as the player switches outcome.
   const pickSelection = (sel: Selection) => {
@@ -116,10 +184,14 @@ export default function DuelPage() {
     }
   };
 
-  const readyUp = async () => {
+  const readyUp = async (divisionId: string) => {
     setBusy(true);
     setNotice(null);
-    const res = await fetch("/api/duel/ready", { method: "POST" });
+    const res = await fetch("/api/duel/ready", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ division: divisionId }),
+    });
     setBusy(false);
     if (!res.ok) {
       setNotice({ kind: "err", text: (await res.json()).message ?? "Couldn't ready up." });
@@ -158,6 +230,8 @@ export default function DuelPage() {
   };
 
   const record = data?.record;
+  const myRp = data?.me?.rp ?? 0;
+  const balance = data?.me?.balance ?? 0;
   const oppAvatar = duel?.opponent?.avatar ? parseAvatar(duel.opponent.avatar) : DEFAULT_AVATAR;
 
   return (
@@ -169,13 +243,20 @@ export default function DuelPage() {
             SHOW<span className="text-gold-400">DOWN</span>
           </h1>
           <p className="mt-2 text-lilac-300">
-            1v1. Same match, sealed calls. Sharpest prediction takes the pot.
+            The ranked mode. 1v1, same match, sealed calls — sharpest prediction takes the pot and
+            climbs the ladder.
           </p>
-          {record && record.played > 0 && (
-            <p className="mt-1 font-mono text-sm text-lilac-400">
-              Your record: <span className="font-bold text-gold-300">{record.wins}W</span> –{" "}
-              {record.played - record.wins}L
-            </p>
+          {data?.me && (
+            <div className="mt-3 flex items-center justify-center gap-2">
+              <span className="font-bold text-white">{data.me.username}</span>
+              <RankBadge rp={myRp} showRp />
+              {record && record.played > 0 && (
+                <span className="font-mono text-sm text-lilac-400">
+                  <span className="font-bold text-gold-300">{record.wins}W</span>–
+                  {record.played - record.wins}L
+                </span>
+              )}
+            </div>
           )}
         </div>
 
@@ -209,11 +290,15 @@ export default function DuelPage() {
                 }`}
               >
                 <p className="display text-3xl text-white">
-                  {duel.result === "won" ? "🏆 YOU TOOK THE POT" : duel.result === "lost" ? "BEATEN AT THE WHISTLE" : "DEAD HEAT — POT SPLIT"}
+                  {duel.result === "won"
+                    ? "🏆 YOU TOOK THE POT"
+                    : duel.result === "lost"
+                      ? "BEATEN AT THE WHISTLE"
+                      : "DEAD HEAT — POT SPLIT"}
                 </p>
                 <p className="mt-1 text-sm text-lilac-300">
-                  {duel.fixture.home_team} {duel.fixture.home_score}–{duel.fixture.away_score}{" "}
-                  {duel.fixture.away_team}
+                  {duel.division.emoji} {duel.division.name} · {duel.fixture.home_team}{" "}
+                  {duel.fixture.home_score}–{duel.fixture.away_score} {duel.fixture.away_team}
                 </p>
                 <div className="mt-3 flex items-center justify-center gap-6 text-sm">
                   <div>
@@ -236,8 +321,16 @@ export default function DuelPage() {
                   </div>
                 </div>
                 {duel.result === "won" && (
-                  <p className="mt-3 flex items-center justify-center gap-1.5 font-mono text-lg font-bold text-gold-300">
-                    +{duel.pot} <Coin />
+                  <p className="mt-3 flex items-center justify-center gap-2 font-mono text-lg font-bold">
+                    <span className="flex items-center gap-1.5 text-gold-300">
+                      +{duel.pot} <Coin />
+                    </span>
+                    <span className="text-turf-300">+{duel.division.rpWin} RP</span>
+                  </p>
+                )}
+                {duel.result === "lost" && (
+                  <p className="mt-3 font-mono text-lg font-bold text-danger-300">
+                    −{duel.division.rpLoss} RP
                   </p>
                 )}
               </div>
@@ -246,43 +339,36 @@ export default function DuelPage() {
               <div className="mb-6 rounded-3xl border-2 border-white/20 bg-night-800/60 p-5 text-center">
                 <p className="display text-2xl text-white">DUEL VOIDED</p>
                 <p className="mt-1 text-sm text-lilac-300">
-                  That match never got a result — both antes refunded.
+                  That match never got a result — both entries refunded, ladder untouched.
                 </p>
               </div>
             )}
 
-            {/* Ready up */}
-            <div className="rounded-3xl border-2 border-gold-600/40 bg-night-800/80 p-6 text-center">
-              <p className="text-5xl">⚔️</p>
-              <h2 className="display mt-2 text-2xl text-white">READY FOR A SHOWDOWN?</h2>
-              <ul className="mx-auto mt-3 max-w-md space-y-1.5 text-left text-sm text-lilac-300">
-                <li>
-                  <span className="font-bold text-gold-300">1.</span> Ante{" "}
-                  <span className="font-mono font-bold text-gold-300">{data?.stake ?? 100}</span>{" "}
-                  coins and ready up — you&apos;re paired with the next player searching.
-                </li>
-                <li>
-                  <span className="font-bold text-gold-300">2.</span> You both get the same match:
-                  the next <span className="font-bold text-white">big clash</span> — the tightest
-                  odds on the slate.
-                </li>
-                <li>
-                  <span className="font-bold text-gold-300">3.</span> Seal a secret call:
-                  winner <span className="text-lilac-100">and</span> exact score. No peeking, no
-                  edits.
-                </li>
-                <li>
-                  <span className="font-bold text-gold-300">4.</span> Right call beats wrong call.
-                  Both right (or both wrong)? Closest scoreline takes the whole pot.
-                </li>
-              </ul>
-              <button
-                onClick={readyUp}
-                disabled={busy}
-                className="btn-press mt-5 rounded-2xl border-b-gold-800 bg-gold-400 px-8 py-3 text-lg font-extrabold text-night-950 hover:bg-gold-300 disabled:opacity-50"
-              >
-                {busy ? "…" : "⚔️ Ready up"}
-              </button>
+            {/* Division picker */}
+            <div className="rounded-3xl border-2 border-gold-600/40 bg-night-800/80 p-5">
+              <div className="text-center">
+                <p className="text-4xl">⚔️</p>
+                <h2 className="display mt-1 text-2xl text-white">PICK YOUR DIVISION</h2>
+                <p className="mx-auto mt-2 max-w-md text-xs text-lilac-300">
+                  Ready up and you&apos;re paired with the next player searching your division. You
+                  both get the <span className="font-bold text-white">next big clash</span> — the
+                  tightest odds kicking off soonest — and seal a secret call: winner{" "}
+                  <span className="text-lilac-100">and</span> exact score. Right call beats wrong;
+                  both right (or wrong), closest scoreline takes the pot and the RP.
+                </p>
+              </div>
+              <div className="mt-4 flex flex-col gap-2">
+                {(data?.divisions ?? []).map((d) => (
+                  <DivisionCard
+                    key={d.id}
+                    division={d}
+                    myRp={myRp}
+                    balance={balance}
+                    busy={busy}
+                    onReady={() => readyUp(d.id)}
+                  />
+                ))}
+              </div>
             </div>
           </>
         ) : duel.phase === "searching" ? (
@@ -290,8 +376,9 @@ export default function DuelPage() {
             <p className="animate-pulse text-5xl">🔎</p>
             <h2 className="display mt-3 text-2xl text-white">SEARCHING FOR AN OPPONENT…</h2>
             <p className="mt-2 text-sm text-lilac-300">
-              Your <span className="font-mono font-bold text-gold-300">{duel.stake}</span>-coin ante
-              is in. The moment another player readies up, you&apos;re on.
+              {duel.division.emoji} <span className="font-bold text-white">{duel.division.name}</span>{" "}
+              · your <span className="font-mono font-bold text-gold-300">{duel.stake.toLocaleString()}</span>-coin
+              entry is in. The moment another player readies up here, you&apos;re on.
             </p>
             <button
               onClick={cancel}
@@ -313,8 +400,14 @@ export default function DuelPage() {
                   <p className="text-xs text-lilac-400">{duel.opponent.duelWins} duel wins</p>
                 </div>
                 <span className="display ml-2 text-xl text-gold-400">VS YOU</span>
-                <span className="ml-auto flex items-center gap-1 font-mono text-sm font-bold text-gold-300">
-                  {duel.pot} <Coin size={14} />
+                <span className="ml-auto flex flex-col items-end">
+                  <span className="flex items-center gap-1 font-mono text-sm font-bold text-gold-300">
+                    {duel.pot.toLocaleString()} <Coin size={14} />
+                  </span>
+                  <span className="text-[10px] font-bold text-lilac-400">
+                    {duel.division.emoji} {duel.division.name} · +{duel.division.rpWin}/−
+                    {duel.division.rpLoss} RP
+                  </span>
                 </span>
               </div>
             )}
@@ -461,6 +554,9 @@ export default function DuelPage() {
             )}
           </div>
         )}
+
+        {board && board.players.length > 0 && <WorldRankings board={board} />}
+        <HallOfFame seasons={hallOfFame} />
       </main>
     </div>
   );

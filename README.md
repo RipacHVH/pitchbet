@@ -1,15 +1,13 @@
 # Futcaster
 
-A football prediction game on **real upcoming matches** with **real bookmaker odds** (median consensus across EU books via The Odds API). Solo career betting plus a competitive multiplayer Arena with ranks.
+A football prediction game on **real upcoming matches** with **real bookmaker odds** (median consensus across EU books via The Odds API). Solo career betting, a ranked 1v1 Showdown ladder, and private friends leagues.
 
-## Multiplayer: The Arena
+## Friends Leagues (`/arena`)
 
-- Every open **arena** is a slate of the next 5 real matches, free to enter — no coins involved.
-- One pick per match, final once locked, closed at kickoff. **The odds are the wager**: a pick is worth odds × 10 Rank Points — call it right and you gain them, call it wrong and you lose the same amount. Longshots pay more and cost more.
-- Global RP never drops below 0. The matchday table ranks managers by RP earned on the slate; topping it earns an arena win (🏆).
-- RP climbs a football-career ladder: Sunday League 0 → Pub Team 75 → Semi-Pro 200 → First Team 400 → Club Legend 750 → Ballon d'Or 1200.
-- Players register with a manager name + password. Since game state lives in a shared Postgres database (not a local file), deploying this app anywhere puts every visitor in the same arenas — genuine online multiplayer.
-- A new arena auto-creates from upcoming fixtures as soon as the previous one settles.
+- Invite-only groups for mates: create a league, share the 6-character code, everyone picks the same slate of the next 5 real matches.
+- One pick per match, final once locked, closed at kickoff. A pick is worth odds × 10 **league points** — right gains them, wrong loses them. Longshots pay more and cost more. League points are bragging rights only; the ranked RP ladder belongs to the Showdown.
+- Head-to-head challenges within a league pit two mates' matchday totals against each other.
+- Players register with a name + password. Since game state lives in a shared Postgres database (not a local file), deploying this app anywhere puts every visitor in the same world — genuine online multiplayer.
 
 ## Run it
 
@@ -26,14 +24,18 @@ Game state (players, fixtures, bets, arenas, shop inventory) lives in Postgres, 
 
 Schema is created automatically on first request (`ensureSchema()` in `src/lib/db.ts`) — no manual migration step.
 
-## Showdown: sealed-envelope 1v1 (`/duel`)
+## Showdown: the ranked mode (`/duel`)
 
-- **Ready up** with a 100-coin ante (escrowed; cancel refunds) and you're FIFO-paired with the next player searching.
-- Both duellists get the same match — **the next big clash**, i.e. the upcoming fixture with the tightest home/away odds.
+Sealed-envelope 1v1 duels drive the global RP ladder.
+
+- **Divisions** gate entry by rank and set the stakes: Sunday League (100 coins, +20/−10 RP) → Pub Team (250, needs 75 RP, +35/−20) → Semi-Pro (500, 200 RP, +50/−30) → First Team (1,000, 400 RP, +70/−45) → Club Legend (2,500, 750 RP, +100/−65) → Ballon d'Or (5,000, 1,200 RP, +150/−100).
+- **Ready up** in a division (entry escrowed; cancel refunds) and you're FIFO-paired with the next player searching it.
+- Both duellists get the same match — **the next big clash**: the tightest-odds game kicking off within 48h (fallback: the soonest upcoming fixture).
 - Each seals a secret call: 1/X/2 **plus an exact scoreline** (the scoreline must agree with the call). Picks stay hidden until both are sealed, then reveal.
-- Winner takes the 200-coin pot: right call beats wrong call; both right (or both wrong) → closest scoreline (total goal distance) wins; dead heat → pot splits back.
+- Winner takes the pot and the RP: right call beats wrong call; both right (or both wrong) → closest scoreline (total goal distance) wins; dead heat → pot splits back, ladder untouched. Global RP never drops below 0.
 - Skipping your pick before kickoff forfeits the pot to whoever sealed one (neither sealed → both refunded). Fixtures that never get a score void with full refunds.
 - Duels resolve in the same global settle pass as everything else ("Check results"), and duel wins are tracked per player.
+- The career ladder: Sunday League 0 → Pub Team 75 → Semi-Pro 200 → First Team 400 → Club Legend 750 → Ballon d'Or 1200. World rankings and the seasonal hall of fame live on the Showdown page.
 
 ## Freeplay coins, the daily wheel & the Locker Room
 

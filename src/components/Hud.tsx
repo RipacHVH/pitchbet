@@ -88,6 +88,7 @@ export function Hud({ pulse = false }: { pulse?: boolean }) {
             </Link>
             {tab("/", "Play")}
             {tab("/arena", "Arena")}
+            {tab("/duel", "Showdown")}
             {tab("/shop", "Shop")}
             {tab("/bets", `Tickets${openBets > 0 ? ` · ${openBets}` : ""}`)}
           </div>

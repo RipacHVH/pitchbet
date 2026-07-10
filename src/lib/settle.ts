@@ -1,6 +1,7 @@
 import { db, withTx, type BetRow, type FixtureRow } from "./db";
 import { fetchScores } from "./oddsApi";
 import { settleArenaRound, type ArenaRevealItem } from "./arena";
+import { resolveDuels } from "./duel";
 
 /** How long after kickoff we consider a match plausibly finished. */
 const MATCH_DURATION_MS = 150 * 60_000;
@@ -65,6 +66,7 @@ export async function settleEverything(callerId: number): Promise<SettleSummary>
          AND (
            EXISTS (SELECT 1 FROM bets b WHERE b.fixture_id = f.id AND b.status = 'open')
            OR EXISTS (SELECT 1 FROM arena_bets ab WHERE ab.fixture_id = f.id AND ab.status = 'open')
+           OR EXISTS (SELECT 1 FROM duels d WHERE d.fixture_id = f.id AND d.status = 'live')
          )`,
       [MATCH_DURATION_MS],
     )
@@ -95,6 +97,8 @@ export async function settleEverything(callerId: number): Promise<SettleSummary>
   const arena = await settleArenaRound(callerId);
   summary.arenasFinalized = arena.finalized.length;
   summary.arenaReveal = arena.reveal;
+
+  await resolveDuels();
 
   return summary;
 }

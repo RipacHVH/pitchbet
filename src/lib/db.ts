@@ -194,6 +194,28 @@ export function ensureSchema(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_challenges_opponent ON challenges (opponent_id, status);
       CREATE INDEX IF NOT EXISTS idx_challenges_challenger ON challenges (challenger_id, status);
 
+      CREATE TABLE IF NOT EXISTS duels (
+        id SERIAL PRIMARY KEY,
+        status TEXT NOT NULL DEFAULT 'searching' CHECK (status IN ('searching','live','completed','void')),
+        stake REAL NOT NULL,
+        fixture_id TEXT REFERENCES fixtures(id),
+        p1_id INTEGER NOT NULL REFERENCES players(id),
+        p2_id INTEGER REFERENCES players(id),
+        p1_selection TEXT CHECK (p1_selection IN ('home','draw','away')),
+        p2_selection TEXT CHECK (p2_selection IN ('home','draw','away')),
+        p1_home_goals INTEGER,
+        p1_away_goals INTEGER,
+        p2_home_goals INTEGER,
+        p2_away_goals INTEGER,
+        winner_id INTEGER REFERENCES players(id),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        matched_at TIMESTAMPTZ,
+        resolved_at TIMESTAMPTZ
+      );
+      CREATE INDEX IF NOT EXISTS idx_duels_searching ON duels (status, created_at);
+      CREATE INDEX IF NOT EXISTS idx_duels_players ON duels (p1_id, p2_id, status);
+      ALTER TABLE players ADD COLUMN IF NOT EXISTS duel_wins INTEGER NOT NULL DEFAULT 0;
+
       CREATE TABLE IF NOT EXISTS player_items (
         player_id INTEGER NOT NULL REFERENCES players(id),
         item_id TEXT NOT NULL,
@@ -258,6 +280,7 @@ export interface PlayerRow {
   arena_wins: number;
   challenge_wins: number;
   season_wins: number;
+  duel_wins: number;
   last_daily_at: string | null;
   password_hash: string | null;
   avatar: string | null;
@@ -332,6 +355,25 @@ export interface ChallengeRow {
   status: "pending" | "accepted" | "declined" | "completed";
   winner_id: number | null;
   created_at: string;
+  resolved_at: string | null;
+}
+
+export interface DuelRow {
+  id: number;
+  status: "searching" | "live" | "completed" | "void";
+  stake: number;
+  fixture_id: string | null;
+  p1_id: number;
+  p2_id: number | null;
+  p1_selection: "home" | "draw" | "away" | null;
+  p2_selection: "home" | "draw" | "away" | null;
+  p1_home_goals: number | null;
+  p1_away_goals: number | null;
+  p2_home_goals: number | null;
+  p2_away_goals: number | null;
+  winner_id: number | null;
+  created_at: string;
+  matched_at: string | null;
   resolved_at: string | null;
 }
 

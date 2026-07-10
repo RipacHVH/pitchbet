@@ -26,6 +26,15 @@ Game state (players, fixtures, bets, arenas, shop inventory) lives in Postgres, 
 
 Schema is created automatically on first request (`ensureSchema()` in `src/lib/db.ts`) — no manual migration step.
 
+## Showdown: sealed-envelope 1v1 (`/duel`)
+
+- **Ready up** with a 100-coin ante (escrowed; cancel refunds) and you're FIFO-paired with the next player searching.
+- Both duellists get the same match — **the next big clash**, i.e. the upcoming fixture with the tightest home/away odds.
+- Each seals a secret call: 1/X/2 **plus an exact scoreline** (the scoreline must agree with the call). Picks stay hidden until both are sealed, then reveal.
+- Winner takes the 200-coin pot: right call beats wrong call; both right (or both wrong) → closest scoreline (total goal distance) wins; dead heat → pot splits back.
+- Skipping your pick before kickoff forfeits the pot to whoever sealed one (neither sealed → both refunded). Fixtures that never get a score void with full refunds.
+- Duels resolve in the same global settle pass as everything else ("Check results"), and duel wins are tracked per player.
+
 ## Freeplay coins, the daily wheel & the Locker Room
 
 - **Daily spin**: one wheel spin per UTC day — 25 up to a 1,000-coin jackpot (~76 average, weighted so rarity strictly decreases as the prize grows: 25 lands 40% of spins, 1000 lands 0.7%). The prize is rolled server-side; the wheel animation just lands on it.

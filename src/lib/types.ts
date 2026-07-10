@@ -158,6 +158,35 @@ export interface HallOfFameResponse {
   seasons: HallOfFameSeason[];
 }
 
+export type DuelPhase = "searching" | "picking" | "waiting" | "locked" | "completed" | "void";
+
+export interface DuelPick {
+  selection: Selection;
+  homeGoals: number;
+  awayGoals: number;
+}
+
+export interface DuelView {
+  id: number;
+  phase: DuelPhase;
+  stake: number;
+  pot: number;
+  fixture: Fixture | null;
+  opponent: { id: number; username: string; avatar: string | null; duelWins: number } | null;
+  myPick: DuelPick | null;
+  theirPick: DuelPick | null;
+  opponentLocked: boolean;
+  result: "won" | "lost" | "split" | null;
+  resolvedAt: string | null;
+}
+
+export interface DuelResponse {
+  duel: DuelView | null;
+  record: { wins: number; played: number } | null;
+  stake: number;
+  me?: { id: number; username: string; balance: number };
+}
+
 export interface CareerRevealItem {
   fixtureId: string;
   homeTeam: string;

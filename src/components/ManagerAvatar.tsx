@@ -251,15 +251,12 @@ export function ManagerAvatar({ config, size = 40 }: { config: AvatarConfig; siz
             {/* re-lay the blush the cutout just painted over */}
             <ellipse cx="23.2" cy="31.4" rx="2" ry="1.25" fill="#ff6f61" opacity="0.3" />
             <ellipse cx="40.8" cy="31.4" rx="2" ry="1.25" fill="#ff6f61" opacity="0.3" />
-            {/* side-swept fringe, longer over the left temple, cropped short on the right — sits on the rim, overlapping generously so it can't leave a gap */}
-            <path d="M18.8 22.5 Q27 27.8 35 24.6 Q40 22.6 45.2 20.9 Q34 17.8 24 18.4 Q20.8 18.6 18.8 22.5 Z" fill={url("hairg")} />
+            {/* side-swept fringe: one smooth crescent (top edge dips toward the brow, bottom edge stays high), peak shifted left so the left side reads longer and the right tapers short — sits on the rim, overlapping generously so it can't leave a gap */}
+            <path d="M19 21.5 Q25 24.4 33 22.4 Q39 19.9 45.5 20.6 Q31 18.4 19 21.5 Z" fill={url("hairg")} />
             {/* combed texture strands following the sweep */}
-            <path d="M21.5 19.8 Q26.5 21.2 31 20.6" stroke={shade(hairC, 0.4)} strokeWidth="0.85" fill="none" opacity="0.6" strokeLinecap="round" />
-            <path d="M26 18.9 Q31.2 21.4 36.5 20.4" stroke={shade(hairC, 0.4)} strokeWidth="0.8" fill="none" opacity="0.55" strokeLinecap="round" />
-            <path d="M33.5 19.6 Q39 21.6 43.6 20.6" stroke={shade(hairC, -0.35)} strokeWidth="0.7" fill="none" opacity="0.4" strokeLinecap="round" />
-            {/* short tapered sides */}
-            <path d="M18.4 24.3 Q17.9 20.2 20.6 18.3" stroke={shade(hairC, -0.3)} strokeWidth="0.6" fill="none" opacity="0.35" strokeLinecap="round" />
-            <path d="M45.6 24.3 Q46.1 20.2 43.4 18.3" stroke={shade(hairC, -0.3)} strokeWidth="0.6" fill="none" opacity="0.35" strokeLinecap="round" />
+            <path d="M21.3 20.6 Q26 22 30.5 21" stroke={shade(hairC, 0.4)} strokeWidth="0.8" fill="none" opacity="0.55" strokeLinecap="round" />
+            <path d="M25.5 19.6 Q30.5 21.6 35.5 20.4" stroke={shade(hairC, 0.4)} strokeWidth="0.75" fill="none" opacity="0.5" strokeLinecap="round" />
+            <path d="M33 20.2 Q38.5 20.6 43.5 20.4" stroke={shade(hairC, -0.35)} strokeWidth="0.6" fill="none" opacity="0.4" strokeLinecap="round" />
           </>
         )}
         {config.hair === 2 && (

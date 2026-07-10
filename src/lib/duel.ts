@@ -413,6 +413,14 @@ const BOT_NAMES = [
   "PitchKing", "SofaManager", "xG Wizard", "DinkDonk", "Riko", "MrClean",
   "Volley Vic", "TikiTaka Tim", "Deano", "CalcioFan", "Magico", "BigSam",
   "LateWinner", "GegenPress", "Nutmeg Nate", "KeeperzGlove", "Frankie B",
+  "Lukas", "Pedrinho", "Ozan", "Yaya T", "Marek", "Kenzo", "Dario",
+  "Stevo", "Iniestazo", "TopBins", "RowZ", "HalfSpace", "FalseNine",
+  "Trequartista", "BoxToBox", "ParkTheBus", "CleanSheet", "OffsideTrap",
+  "Panenka", "Rabona", "LaCroqueta", "ElasticoKid", "TrivelaKing",
+  "WorldieOnly", "StoppageTime", "FergieTime", "TheGaffer", "WingWizard",
+  "No10Role", "SweeperKeeper", "Catenaccio", "JogaBonito", "Golazo Gus",
+  "Mbombo", "Kaito", "Santi", "Viktor", "Ludo", "Tomasz", "Rafa",
+  "Bruninho", "Kwame", "Jesper", "Matteo", "Aleksi", "Dmitri", "Callum",
 ];
 
 /** Wait 26–54s (varies per duel) before a bot steps in — never a flat 30. */
@@ -581,7 +589,7 @@ export async function maybeRunBots(): Promise<void> {
    bots spread across the tiers, and let their RP drift like they're playing
    their own duels — each bot moves roughly every day or two. */
 
-const LADDER_BOT_TARGET = 18;
+const LADDER_BOT_TARGET = 72;
 const DRIFT_INTERVAL_MS = 12 * 60 * 60_000; // a pass at most twice a day
 /** Chance a given bot "played" since the last pass (~every 1-2 days each). */
 const DRIFT_PLAY_CHANCE = 0.55;

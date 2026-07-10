@@ -217,6 +217,8 @@ export function ensureSchema(): Promise<void> {
       ALTER TABLE players ADD COLUMN IF NOT EXISTS duel_wins INTEGER NOT NULL DEFAULT 0;
       -- Ranked divisions: which queue the duel belongs to.
       ALTER TABLE duels ADD COLUMN IF NOT EXISTS tier TEXT NOT NULL DEFAULT 'sunday';
+      -- Matchmaking bots that step in when no human opponent shows up.
+      ALTER TABLE players ADD COLUMN IF NOT EXISTS is_bot BOOLEAN NOT NULL DEFAULT false;
 
       CREATE TABLE IF NOT EXISTS player_items (
         player_id INTEGER NOT NULL REFERENCES players(id),
@@ -283,6 +285,7 @@ export interface PlayerRow {
   challenge_wins: number;
   season_wins: number;
   duel_wins: number;
+  is_bot: boolean;
   last_daily_at: string | null;
   password_hash: string | null;
   avatar: string | null;

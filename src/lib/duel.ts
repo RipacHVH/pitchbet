@@ -395,6 +395,179 @@ export async function resolveDuels(): Promise<number> {
   return resolved;
 }
 
+/* ---------------- Matchmaking bots ----------------
+   When nobody human shows up, a bot steps in so the queue never dead-ends.
+   Delays are pseudo-random per duel (never a fixed 30s) and the bot takes
+   its own sweet time to pick, so the pacing feels like a person. */
+
+const BOT_NAMES = [
+  "Kondor", "MattyP", "jamie10", "El Nino9", "TurboTom", "Silva CF",
+  "PitchKing", "SofaManager", "xG Wizard", "DinkDonk", "Riko", "MrClean",
+  "Volley Vic", "TikiTaka Tim", "Deano", "CalcioFan", "Magico", "BigSam",
+  "LateWinner", "GegenPress", "Nutmeg Nate", "KeeperzGlove", "Frankie B",
+];
+
+/** Wait 26–54s (varies per duel) before a bot steps in — never a flat 30. */
+function botMatchDelayMs(duelId: number): number {
+  return 26_000 + ((duelId * 7919) % 29) * 1000;
+}
+
+/** After matching, the bot "thinks" for another 20–89s before sealing. */
+function botPickDelayMs(duelId: number): number {
+  return 20_000 + ((duelId * 104729) % 70) * 1000;
+}
+
+function randomBotAvatar(): string {
+  const r = (n: number) => Math.floor(Math.random() * n);
+  return JSON.stringify({
+    skin: r(4),
+    hair: r(5),
+    hairColor: r(5),
+    kit: `basic-${r(4)}`,
+    head: null,
+    extra: null,
+  });
+}
+
+/** A plausible human-looking call: outcome weighted by the odds, then a common scoreline for it. */
+function botCall(fixture: FixtureRow): { selection: "home" | "draw" | "away"; hg: number; ag: number } {
+  const inv = {
+    home: 1 / (fixture.home_odds ?? 3),
+    draw: 1 / (fixture.draw_odds ?? 3.5),
+    away: 1 / (fixture.away_odds ?? 3),
+  };
+  const total = inv.home + inv.draw + inv.away;
+  let roll = Math.random() * total;
+  let selection: "home" | "draw" | "away" = "home";
+  for (const s of ["home", "draw", "away"] as const) {
+    roll -= inv[s];
+    if (roll <= 0) {
+      selection = s;
+      break;
+    }
+  }
+
+  const weighted = <T,>(opts: [T, number][]): T => {
+    let r = Math.random() * opts.reduce((a, [, w]) => a + w, 0);
+    for (const [v, w] of opts) {
+      r -= w;
+      if (r <= 0) return v;
+    }
+    return opts[0][0];
+  };
+
+  if (selection === "draw") {
+    const [hg, ag2] = weighted<[number, number]>([
+      [[0, 0], 25],
+      [[1, 1], 45],
+      [[2, 2], 25],
+      [[3, 3], 5],
+    ]);
+    return { selection, hg, ag: ag2 };
+  }
+  const [w, l] = weighted<[number, number]>([
+    [[1, 0], 28],
+    [[2, 0], 18],
+    [[2, 1], 26],
+    [[3, 1], 12],
+    [[3, 0], 8],
+    [[3, 2], 5],
+    [[4, 1], 3],
+  ]);
+  return selection === "home" ? { selection, hg: w, ag: l } : { selection, hg: l, ag: w };
+}
+
+/** A bot account that isn't already fighting someone, created if none free. */
+async function claimBot(tx: Queryable, stake: number): Promise<number> {
+  const free = await tx.one<{ id: number }>(
+    `SELECT p.id FROM players p
+     WHERE p.is_bot AND NOT EXISTS (
+       SELECT 1 FROM duels d
+       WHERE (d.p1_id = p.id OR d.p2_id = p.id) AND d.status IN ('searching','live')
+     )
+     ORDER BY random() LIMIT 1`,
+  );
+  if (free) {
+    // Keep the wallet topped up so entry fees never block the queue.
+    await tx.exec("UPDATE players SET balance = balance + ? WHERE id = ? AND balance < ?", [
+      stake * 10,
+      free.id,
+      stake,
+    ]);
+    return free.id;
+  }
+
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const base = BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)];
+    const name = attempt === 0 ? base : `${base}${Math.floor(Math.random() * 90) + 10}`;
+    const taken = await tx.one("SELECT 1 FROM players WHERE lower(username) = lower(?)", [name]);
+    if (taken) continue;
+    const created = await tx.one<{ id: number }>(
+      `INSERT INTO players (username, balance, is_bot, avatar) VALUES (?, ?, true, ?) RETURNING id`,
+      [name, 1_000_000, randomBotAvatar()],
+    );
+    return created!.id;
+  }
+  throw new Error("could not find a free bot name");
+}
+
+/**
+ * Give lonely queues an opponent and make matched bots seal their calls.
+ * Runs on every Showdown poll — cheap when there's nothing to do.
+ */
+export async function maybeRunBots(): Promise<void> {
+  // 1. Appoint a bot to any duel that has waited past its (randomized) patience.
+  const lonely = await db().many<DuelRow>(
+    `SELECT d.* FROM duels d JOIN players p ON p.id = d.p1_id
+     WHERE d.status = 'searching' AND NOT p.is_bot`,
+  );
+  for (const duel of lonely) {
+    if (Date.now() - Date.parse(duel.created_at) < botMatchDelayMs(duel.id)) continue;
+    await withTx(async (tx) => {
+      // Re-check inside the tx — a human may have grabbed the slot meanwhile.
+      const fresh = await tx.one<DuelRow>(
+        "SELECT * FROM duels WHERE id = ? AND status = 'searching' FOR UPDATE SKIP LOCKED",
+        [duel.id],
+      );
+      if (!fresh) return;
+      const fixture = await nextBigGame(tx);
+      if (!fixture) return;
+      const botId = await claimBot(tx, fresh.stake);
+      await tx.exec("UPDATE players SET balance = balance - ? WHERE id = ?", [fresh.stake, botId]);
+      await tx.exec(
+        "UPDATE duels SET status = 'live', p2_id = ?, fixture_id = ?, matched_at = now() WHERE id = ?",
+        [botId, fixture.id, fresh.id],
+      );
+    });
+  }
+
+  // 2. Bots that are matched but haven't sealed yet pick once their think-time is up.
+  const pending = await db().many<
+    DuelRow & { bot_side: string }
+  >(
+    `SELECT d.*, CASE WHEN pb1.is_bot THEN 'p1' ELSE 'p2' END AS bot_side
+     FROM duels d
+     JOIN players pb1 ON pb1.id = d.p1_id
+     LEFT JOIN players pb2 ON pb2.id = d.p2_id
+     WHERE d.status = 'live' AND d.matched_at IS NOT NULL
+       AND ((pb1.is_bot AND d.p1_selection IS NULL) OR (pb2.is_bot AND d.p2_selection IS NULL))`,
+  );
+  for (const duel of pending) {
+    if (Date.now() - Date.parse(duel.matched_at!) < botPickDelayMs(duel.id)) continue;
+    const fixture = await db().one<FixtureRow>("SELECT * FROM fixtures WHERE id = ?", [
+      duel.fixture_id,
+    ]);
+    if (!fixture || Date.parse(fixture.commence_time) <= Date.now()) continue;
+    const call = botCall(fixture);
+    const side = duel.bot_side;
+    await db().exec(
+      `UPDATE duels SET ${side}_selection = ?, ${side}_home_goals = ?, ${side}_away_goals = ?
+       WHERE id = ? AND ${side}_selection IS NULL`,
+      [call.selection, call.hg, call.ag, duel.id],
+    );
+  }
+}
+
 /** Lifetime duel record for the scoreboard strip on the Showdown page. */
 export async function duelRecord(playerId: number): Promise<{ wins: number; played: number }> {
   const row = await db().one<{ wins: string; played: string }>(

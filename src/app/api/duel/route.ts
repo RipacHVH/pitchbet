@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { currentPlayer } from "@/lib/identity";
-import { getMyDuel, duelRecord, DIVISIONS } from "@/lib/duel";
+import { getMyDuel, duelRecord, maybeRunBots, DIVISIONS } from "@/lib/duel";
 import { refreshStaleFixtures } from "@/lib/fixtures";
 import { TIERS } from "@/lib/ranks";
 
@@ -8,6 +8,7 @@ export async function GET() {
   const player = await currentPlayer();
   if (!player) return NextResponse.json({ duel: null, record: null, divisions: DIVISIONS, tiers: TIERS });
   await refreshStaleFixtures(false);
+  await maybeRunBots();
 
   return NextResponse.json({
     duel: await getMyDuel(player.id),

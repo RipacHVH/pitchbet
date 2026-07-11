@@ -302,18 +302,6 @@ export default function DuelPage() {
     await Promise.all([load(), refreshMe()]);
   };
 
-  const requestRematch = async () => {
-    setBusy(true);
-    setNotice(null);
-    const res = await fetch("/api/duel/rematch", { method: "POST" });
-    setBusy(false);
-    if (!res.ok) {
-      setNotice({ kind: "err", text: (await res.json()).message ?? "Couldn't set up the rematch." });
-      return;
-    }
-    await Promise.all([load(), refreshMe()]);
-  };
-
   const cancel = async () => {
     setBusy(true);
     const res = await fetch("/api/duel/cancel", { method: "POST" });
@@ -461,15 +449,6 @@ export default function DuelPage() {
                   <p className="mt-3 font-mono text-lg font-bold text-danger-300">
                     −{duel.division.rpLoss} RP
                   </p>
-                )}
-                {duel.opponent && (
-                  <button
-                    onClick={requestRematch}
-                    disabled={busy}
-                    className="btn-press mt-4 rounded-2xl border-b-gold-800 bg-gold-400 px-6 py-2.5 font-black text-night-950 hover:bg-gold-300 disabled:opacity-50"
-                  >
-                    ⚔️ Rematch {duel.opponent.username}
-                  </button>
                 )}
               </div>
             )}

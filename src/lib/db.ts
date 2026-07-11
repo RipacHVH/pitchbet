@@ -221,8 +221,6 @@ export function ensureSchema(): Promise<void> {
       ALTER TABLE players ADD COLUMN IF NOT EXISTS is_bot BOOLEAN NOT NULL DEFAULT false;
       -- Consecutive daily-spin streak (transparent bonus, resets quietly on a miss).
       ALTER TABLE players ADD COLUMN IF NOT EXISTS streak_days INTEGER NOT NULL DEFAULT 0;
-      -- Rematches: who this queued duel would rather be matched with.
-      ALTER TABLE duels ADD COLUMN IF NOT EXISTS preferred_opponent_id INTEGER REFERENCES players(id);
 
       -- One row per claimed weekly quest (quest_key embeds the ISO week).
       CREATE TABLE IF NOT EXISTS quest_claims (
@@ -391,7 +389,6 @@ export interface DuelRow {
   p2_home_goals: number | null;
   p2_away_goals: number | null;
   winner_id: number | null;
-  preferred_opponent_id: number | null;
   created_at: string;
   matched_at: string | null;
   resolved_at: string | null;

@@ -29,6 +29,7 @@ export function SpinWheel({
 }) {
   const [spinning, setSpinning] = useState(false);
   const [prize, setPrize] = useState<number | null>(null);
+  const [streak, setStreak] = useState<{ days: number; bonus: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [rotation, setRotation] = useState(0);
   const doneRef = useRef(false);
@@ -42,23 +43,32 @@ export function SpinWheel({
       setError((await res.json()).message ?? "Spin failed — try again.");
       return;
     }
-    const body: { prize: number; index: number; newBalance: number } = await res.json();
+    const body: {
+      prize: number;
+      index: number;
+      streakDays: number;
+      streakBonus: number;
+      newBalance: number;
+    } = await res.json();
 
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const finish = () => {
+      setPrize(body.prize);
+      setStreak({ days: body.streakDays, bonus: body.streakBonus });
+      onDone(body.prize + body.streakBonus, body.newBalance);
+    };
     // Land the winning segment's centre under the top pointer.
     const target = 5 * 360 + (360 - (body.index * SEG_ANGLE + SEG_ANGLE / 2));
     if (reduced) {
       setRotation(target % 360);
-      setPrize(body.prize);
-      onDone(body.prize, body.newBalance);
+      finish();
       return;
     }
     setRotation(target);
     setTimeout(() => {
       if (doneRef.current) return;
       doneRef.current = true;
-      setPrize(body.prize);
-      onDone(body.prize, body.newBalance);
+      finish();
     }, 4300);
   };
 
@@ -119,6 +129,16 @@ export function SpinWheel({
             <p className="display text-3xl text-gold-300">
               +{prize.toLocaleString()} <Coin size={22} />
             </p>
+            {streak && streak.bonus > 0 && (
+              <p className="mt-0.5 text-sm font-bold text-turf-300">
+                🔥 {streak.days}-day streak: +{streak.bonus} bonus
+              </p>
+            )}
+            {streak && streak.bonus === 0 && streak.days === 1 && (
+              <p className="mt-0.5 text-xs font-bold text-lilac-400">
+                Spin again tomorrow to start a streak (+15/day, up to +75)
+              </p>
+            )}
             <p className="text-sm font-bold text-lilac-300">
               {prize >= 1000 ? "JACKPOT! Scenes." : prize >= 250 ? "Big spin!" : "In the bank."}
             </p>

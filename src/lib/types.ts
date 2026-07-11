@@ -190,12 +190,36 @@ export interface DuelView {
   estimatedWaitSeconds: number;
 }
 
+export interface DuelStats {
+  wins: number;
+  played: number;
+  currentStreak: number;
+  bestStreak: number;
+  biggestPot: number;
+}
+
 export interface DuelResponse {
   duel: DuelView | null;
-  record: { wins: number; played: number } | null;
+  record: DuelStats | null;
   divisions: DuelDivision[];
   tiers: { name: string; min: number; color: string }[];
   me?: { id: number; username: string; balance: number; rp: number; duelWins: number };
+}
+
+export interface QuestView {
+  id: string;
+  title: string;
+  target: number;
+  reward: number;
+  emoji: string;
+  progress: number;
+  claimed: boolean;
+  claimable: boolean;
+}
+
+export interface QuestsResponse {
+  weekKey: string | null;
+  quests: QuestView[];
 }
 
 export interface CareerRevealItem {

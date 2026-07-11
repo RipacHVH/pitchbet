@@ -121,6 +121,7 @@ async function activeDuel(playerId: number, tx?: Queryable): Promise<DuelRow | u
 export async function readyUp(
   playerId: number,
   divisionId: string,
+  preferredOpponentId?: number,
 ): Promise<{ error?: string; status?: number }> {
   const division = divisionById(divisionId);
   if (!division) return { error: "No such division.", status: 400 };
@@ -146,10 +147,13 @@ export async function readyUp(
     }
 
     // FOR UPDATE SKIP LOCKED: concurrent ready-ups each claim a different row.
+    // A rematch pairs with its preferred opponent first if they're queued;
+    // mutual preference (they hit rematch too) outranks the FIFO queue.
     const open = await tx.one<DuelRow>(
       `SELECT * FROM duels WHERE status = 'searching' AND tier = ? AND p1_id != ?
-       ORDER BY created_at ASC LIMIT 1 FOR UPDATE SKIP LOCKED`,
-      [division.id, playerId],
+       ORDER BY (p1_id = ?) DESC, (preferred_opponent_id = ?) DESC, created_at ASC
+       LIMIT 1 FOR UPDATE SKIP LOCKED`,
+      [division.id, playerId, preferredOpponentId ?? -1, playerId],
     );
 
     const fixture = open ? await nextBigGame(tx) : undefined;
@@ -157,8 +161,8 @@ export async function readyUp(
     if (!open || !fixture) {
       // Nobody to fight (or no servable match yet): queue up and wait.
       await tx.exec(
-        "INSERT INTO duels (status, tier, stake, p1_id) VALUES ('searching', ?, ?, ?)",
-        [division.id, division.entry, playerId],
+        "INSERT INTO duels (status, tier, stake, p1_id, preferred_opponent_id) VALUES ('searching', ?, ?, ?, ?)",
+        [division.id, division.entry, playerId, preferredOpponentId ?? null],
       );
       return {};
     }
@@ -169,6 +173,19 @@ export async function readyUp(
     );
     return {};
   });
+}
+
+/** Queue for a rematch against the opponent from the player's last finished duel. */
+export async function rematch(playerId: number): Promise<{ error?: string; status?: number }> {
+  const last = await db().one<DuelRow>(
+    `SELECT * FROM duels
+     WHERE status = 'completed' AND (p1_id = ? OR p2_id = ?)
+     ORDER BY resolved_at DESC LIMIT 1`,
+    [playerId, playerId],
+  );
+  if (!last || last.p2_id === null) return { error: "No finished duel to rematch.", status: 409 };
+  const opponentId = last.p1_id === playerId ? last.p2_id : last.p1_id;
+  return readyUp(playerId, last.tier, opponentId);
 }
 
 /** Leave the queue (only while still unmatched) and take the entry back. */
@@ -538,7 +555,18 @@ export async function maybeRunBots(): Promise<void> {
      WHERE d.status = 'searching' AND NOT p.is_bot`,
   );
   for (const duel of lonely) {
-    if (Date.now() - Date.parse(duel.created_at) < botMatchDelayMs(duel.id)) continue;
+    // A rematch against a bot gets accepted faster — they were just here.
+    const preferredBot = duel.preferred_opponent_id
+      ? await db().one<{ id: number }>(
+          `SELECT id FROM players WHERE id = ? AND is_bot AND NOT EXISTS (
+             SELECT 1 FROM duels d WHERE (d.p1_id = players.id OR d.p2_id = players.id)
+               AND d.status IN ('searching','live')
+           )`,
+          [duel.preferred_opponent_id],
+        )
+      : undefined;
+    const patience = preferredBot ? botMatchDelayMs(duel.id) / 2 : botMatchDelayMs(duel.id);
+    if (Date.now() - Date.parse(duel.created_at) < patience) continue;
     await withTx(async (tx) => {
       // Re-check inside the tx — a human may have grabbed the slot meanwhile.
       const fresh = await tx.one<DuelRow>(
@@ -548,7 +576,14 @@ export async function maybeRunBots(): Promise<void> {
       if (!fresh) return;
       const fixture = await nextBigGame(tx);
       if (!fixture) return;
-      const botId = await claimBot(tx, fresh.stake);
+      const botId = preferredBot ? preferredBot.id : await claimBot(tx, fresh.stake);
+      if (preferredBot) {
+        await tx.exec("UPDATE players SET balance = balance + ? WHERE id = ? AND balance < ?", [
+          fresh.stake * 10,
+          botId,
+          fresh.stake,
+        ]);
+      }
       await tx.exec("UPDATE players SET balance = balance - ? WHERE id = ?", [fresh.stake, botId]);
       await tx.exec(
         "UPDATE duels SET status = 'live', p2_id = ?, fixture_id = ?, matched_at = now() WHERE id = ?",
@@ -646,15 +681,37 @@ export async function driftBotLadder(): Promise<void> {
   }
 }
 
-/** Lifetime duel record for the scoreboard strip on the Showdown page. */
-export async function duelRecord(playerId: number): Promise<{ wins: number; played: number }> {
-  const row = await db().one<{ wins: string; played: string }>(
-    `SELECT
-       COUNT(*) FILTER (WHERE winner_id = ?) AS wins,
-       COUNT(*) AS played
-     FROM duels
-     WHERE status = 'completed' AND (p1_id = ? OR p2_id = ?)`,
-    [playerId, playerId, playerId],
+export interface DuelStats {
+  wins: number;
+  played: number;
+  currentStreak: number;
+  bestStreak: number;
+  biggestPot: number;
+}
+
+/** Lifetime duel stats for the personal strip on the Showdown page. */
+export async function duelRecord(playerId: number): Promise<DuelStats> {
+  const rows = await db().many<{ winner_id: number | null; stake: number }>(
+    `SELECT winner_id, stake FROM duels
+     WHERE status = 'completed' AND (p1_id = ? OR p2_id = ?)
+     ORDER BY resolved_at ASC, id ASC`,
+    [playerId, playerId],
   );
-  return { wins: Number(row?.wins ?? 0), played: Number(row?.played ?? 0) };
+
+  let wins = 0;
+  let currentStreak = 0;
+  let bestStreak = 0;
+  let biggestPot = 0;
+  for (const r of rows) {
+    if (r.winner_id === playerId) {
+      wins++;
+      currentStreak++;
+      bestStreak = Math.max(bestStreak, currentStreak);
+      biggestPot = Math.max(biggestPot, r.stake * 2);
+    } else if (r.winner_id !== null) {
+      currentStreak = 0; // a split leaves the streak alive
+    }
+  }
+
+  return { wins, played: rows.length, currentStreak, bestStreak, biggestPot };
 }

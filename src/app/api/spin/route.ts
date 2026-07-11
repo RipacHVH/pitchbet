@@ -18,18 +18,27 @@ function rollSegment(): number {
   return 0;
 }
 
+/** Streak bonus: +15 coins per consecutive prior day, capped at +75. */
+const STREAK_BONUS_PER_DAY = 15;
+const STREAK_BONUS_CAP_DAYS = 5;
+
 export async function POST() {
   const player = await currentPlayer();
   if (!player) return NextResponse.json({ message: "Log in first" }, { status: 401 });
 
   const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
   const index = rollSegment();
   const prize = WHEEL_SEGMENTS[index];
 
+  // Missing a day just starts the count over — no decay, no guilt screen.
+  const streakDays = player.last_daily_at === yesterday ? player.streak_days + 1 : 1;
+  const streakBonus = Math.min(streakDays - 1, STREAK_BONUS_CAP_DAYS) * STREAK_BONUS_PER_DAY;
+
   const claimed = await db().exec(
-    `UPDATE players SET balance = balance + ?, last_daily_at = ?
+    `UPDATE players SET balance = balance + ?, last_daily_at = ?, streak_days = ?
      WHERE id = ? AND (last_daily_at IS NULL OR last_daily_at <> ?)`,
-    [prize, today, player.id, today],
+    [prize + streakBonus, today, streakDays, player.id, today],
   );
 
   if (claimed.rowCount === 0) {
@@ -39,5 +48,5 @@ export async function POST() {
   const row = await db().one<{ balance: number }>("SELECT balance FROM players WHERE id = ?", [
     player.id,
   ]);
-  return NextResponse.json({ prize, index, newBalance: row!.balance });
+  return NextResponse.json({ prize, index, streakDays, streakBonus, newBalance: row!.balance });
 }

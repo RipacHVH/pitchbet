@@ -9,6 +9,7 @@ import { ManagerAvatar } from "@/components/ManagerAvatar";
 import { RankBadge } from "@/components/RankBadge";
 import { HallOfFame, WorldRankings } from "@/components/RankedBoards";
 import { parseAvatar, DEFAULT_AVATAR } from "@/lib/avatar";
+import { tierFor, nextTier } from "@/lib/ranks";
 import { useMe } from "@/lib/MeContext";
 import type {
   DuelDivision,
@@ -63,6 +64,80 @@ function GoalStepper({
           aria-label={`more ${label} goals`}
         >
           +
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Progress toward the next career tier, under the rank strip. */
+function RankProgress({ rp }: { rp: number }) {
+  const next = nextTier(rp);
+  if (!next) {
+    return (
+      <p className="mt-1.5 text-xs font-bold text-gold-300">
+        👑 Top of the ladder — nothing above Ballon d&apos;Or.
+      </p>
+    );
+  }
+  const current = tierFor(rp);
+  const pct = Math.round(((rp - current.min) / (next.min - current.min)) * 100);
+  return (
+    <div className="mx-auto mt-2 w-full max-w-xs">
+      <div className="h-2.5 overflow-hidden rounded-full bg-night-950/80">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-gold-600 to-gold-300"
+          style={{ width: `${Math.max(3, pct)}%` }}
+        />
+      </div>
+      <p className="mt-1 text-[11px] font-bold text-lilac-400">
+        <span className="font-mono text-lilac-200">{next.min - rp} RP</span> to{" "}
+        <span style={{ color: next.color }}>{next.name}</span>
+      </p>
+    </div>
+  );
+}
+
+/** Full-screen moment when the player crosses into a new tier. */
+function RankUpCelebration({ rp, meId }: { rp: number; meId: number }) {
+  const [show, setShow] = useState<string | null>(null);
+
+  useEffect(() => {
+    const key = `futcaster-tier-${meId}`;
+    const tier = tierFor(rp);
+    const seen = window.localStorage.getItem(key);
+    if (seen === null) {
+      // First visit: remember where they are, celebrate only future climbs.
+      window.localStorage.setItem(key, `${tier.min}`);
+      return;
+    }
+    if (tier.min > Number(seen)) {
+      window.localStorage.setItem(key, `${tier.min}`);
+      setShow(tier.name);
+    }
+  }, [rp, meId]);
+
+  if (!show) return null;
+  const tier = tierFor(rp);
+  return (
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center bg-night-950/90 p-4 backdrop-blur-sm"
+      onClick={() => setShow(null)}
+    >
+      <div className="pop-in flex w-full max-w-sm flex-col items-center rounded-3xl border-2 border-gold-600/70 bg-night-700 p-8 text-center shadow-[0_10px_0_rgba(0,0,0,.4)]">
+        <p className="text-6xl">🎉</p>
+        <p className="display mt-3 text-xl text-lilac-300">PROMOTED TO</p>
+        <p className="display mt-1 text-4xl" style={{ color: tier.color }}>
+          {show}
+        </p>
+        <p className="mt-3 text-sm font-bold text-lilac-300">
+          Your calls got you here. Keep them sharp.
+        </p>
+        <button
+          onClick={() => setShow(null)}
+          className="btn-press mt-5 w-full rounded-2xl border-b-gold-800 bg-gold-400 px-6 py-2.5 font-black text-night-950 hover:bg-gold-300"
+        >
+          On we go
         </button>
       </div>
     </div>
@@ -227,6 +302,18 @@ export default function DuelPage() {
     await Promise.all([load(), refreshMe()]);
   };
 
+  const requestRematch = async () => {
+    setBusy(true);
+    setNotice(null);
+    const res = await fetch("/api/duel/rematch", { method: "POST" });
+    setBusy(false);
+    if (!res.ok) {
+      setNotice({ kind: "err", text: (await res.json()).message ?? "Couldn't set up the rematch." });
+      return;
+    }
+    await Promise.all([load(), refreshMe()]);
+  };
+
   const cancel = async () => {
     setBusy(true);
     const res = await fetch("/api/duel/cancel", { method: "POST" });
@@ -273,18 +360,34 @@ export default function DuelPage() {
             climbs the ladder.
           </p>
           {data?.me && (
-            <div className="mt-3 flex items-center justify-center gap-2">
-              <span className="font-bold text-white">{data.me.username}</span>
-              <RankBadge rp={myRp} showRp />
+            <>
+              <div className="mt-3 flex items-center justify-center gap-2">
+                <span className="font-bold text-white">{data.me.username}</span>
+                <RankBadge rp={myRp} showRp />
+              </div>
+              <RankProgress rp={myRp} />
               {record && record.played > 0 && (
-                <span className="font-mono text-sm text-lilac-400">
-                  <span className="font-bold text-gold-300">{record.wins}W</span>–
-                  {record.played - record.wins}L
-                </span>
+                <div className="mx-auto mt-3 flex w-fit items-center gap-4 rounded-2xl border border-white/10 bg-night-800/80 px-4 py-2 font-mono text-xs font-bold text-lilac-300">
+                  <span>
+                    <span className="text-gold-300">{record.wins}W</span>–
+                    {record.played - record.wins}L
+                  </span>
+                  {record.currentStreak >= 2 && (
+                    <span className="text-turf-300">🔥 {record.currentStreak} streak</span>
+                  )}
+                  {record.bestStreak >= 2 && <span>best {record.bestStreak}</span>}
+                  {record.biggestPot > 0 && (
+                    <span className="flex items-center gap-1">
+                      top pot {record.biggestPot.toLocaleString()} <Coin size={11} />
+                    </span>
+                  )}
+                </div>
               )}
-            </div>
+            </>
           )}
         </div>
+
+        {data?.me && <RankUpCelebration rp={myRp} meId={data.me.id} />}
 
         {notice && (
           <div
@@ -358,6 +461,15 @@ export default function DuelPage() {
                   <p className="mt-3 font-mono text-lg font-bold text-danger-300">
                     −{duel.division.rpLoss} RP
                   </p>
+                )}
+                {duel.opponent && (
+                  <button
+                    onClick={requestRematch}
+                    disabled={busy}
+                    className="btn-press mt-4 rounded-2xl border-b-gold-800 bg-gold-400 px-6 py-2.5 font-black text-night-950 hover:bg-gold-300 disabled:opacity-50"
+                  >
+                    ⚔️ Rematch {duel.opponent.username}
+                  </button>
                 )}
               </div>
             )}

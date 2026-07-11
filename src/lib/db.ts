@@ -219,6 +219,18 @@ export function ensureSchema(): Promise<void> {
       ALTER TABLE duels ADD COLUMN IF NOT EXISTS tier TEXT NOT NULL DEFAULT 'sunday';
       -- Matchmaking bots that step in when no human opponent shows up.
       ALTER TABLE players ADD COLUMN IF NOT EXISTS is_bot BOOLEAN NOT NULL DEFAULT false;
+      -- Consecutive daily-spin streak (transparent bonus, resets quietly on a miss).
+      ALTER TABLE players ADD COLUMN IF NOT EXISTS streak_days INTEGER NOT NULL DEFAULT 0;
+      -- Rematches: who this queued duel would rather be matched with.
+      ALTER TABLE duels ADD COLUMN IF NOT EXISTS preferred_opponent_id INTEGER REFERENCES players(id);
+
+      -- One row per claimed weekly quest (quest_key embeds the ISO week).
+      CREATE TABLE IF NOT EXISTS quest_claims (
+        player_id INTEGER NOT NULL REFERENCES players(id),
+        quest_key TEXT NOT NULL,
+        claimed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        PRIMARY KEY (player_id, quest_key)
+      );
 
       CREATE TABLE IF NOT EXISTS player_items (
         player_id INTEGER NOT NULL REFERENCES players(id),
@@ -286,6 +298,7 @@ export interface PlayerRow {
   season_wins: number;
   duel_wins: number;
   is_bot: boolean;
+  streak_days: number;
   last_daily_at: string | null;
   password_hash: string | null;
   avatar: string | null;
@@ -378,6 +391,7 @@ export interface DuelRow {
   p2_home_goals: number | null;
   p2_away_goals: number | null;
   winner_id: number | null;
+  preferred_opponent_id: number | null;
   created_at: string;
   matched_at: string | null;
   resolved_at: string | null;

@@ -6,6 +6,7 @@ import { TeamBadge } from "@/components/TeamBadge";
 import { Countdown } from "@/components/Countdown";
 import { JoinGate } from "@/components/JoinGate";
 import { SpinWheel } from "@/components/SpinWheel";
+import { QuestsCard } from "@/components/QuestsCard";
 import { useMe } from "@/lib/MeContext";
 import Link from "next/link";
 import type { Fixture, FixturesResponse, Selection } from "@/lib/types";
@@ -131,6 +132,8 @@ export default function PlayPage() {
             </p>
           )}
         </section>
+
+        <QuestsCard />
 
         {placed && (
           <div className="pop-in mb-5 flex items-center gap-3 rounded-2xl border-2 border-gold-600/70 bg-night-700 p-4 shadow-[0_6px_0_rgba(0,0,0,.35)]">

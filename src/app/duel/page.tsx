@@ -664,9 +664,7 @@ export default function DuelPage() {
                   </div>
                 </div>
                 <p className="mt-3 text-center text-xs text-lilac-300">
-                  Nothing to do but watch. Check back after full time and hit{" "}
-                  <span className="font-bold text-lilac-100">Check results</span> on the Tickets
-                  page.
+                  Nothing to do but watch — the result lands here automatically after full time.
                 </p>
               </div>
             )}

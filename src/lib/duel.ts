@@ -1,4 +1,5 @@
 import { db, getMeta, setMeta, withTx, type DuelRow, type FixtureRow, type Queryable } from "./db";
+import { fetchScores } from "./oddsApi";
 
 /** Duels whose fixture never got a score within this window are voided (both refunded). */
 const VOID_AFTER_MS = 4 * 24 * 60 * 60_000;
@@ -312,6 +313,60 @@ export async function getMyDuel(playerId: number): Promise<DuelView | null> {
     // than that and matchmaking always beats its own estimate.
     estimatedWaitSeconds: Math.ceil(botMatchDelayMs(row.id) / 1000 / 15) * 15,
   };
+}
+
+/** Check for finals on live-duel fixtures at most this often per league. */
+const DUEL_SCORE_TTL_MS = 15 * 60_000;
+
+/**
+ * Fast score capture just for fixtures with live duels riding on them.
+ * The general passive capture waits up to 6h between checks, which is fine
+ * for career bets (settled manually anyway) but makes the Showdown feel
+ * dead after full time — duellists are watching the page. 15-minute TTL,
+ * still 2 credits per league and only for leagues that actually have a
+ * live duel past full time.
+ */
+async function captureDuelScores(): Promise<void> {
+  const pendingSports = (
+    await db().many<{ sport_key: string }>(
+      `SELECT DISTINCT f.sport_key FROM duels d
+       JOIN fixtures f ON f.id = d.fixture_id
+       WHERE d.status = 'live' AND f.completed = 0
+         AND EXTRACT(EPOCH FROM (now() - f.commence_time::timestamptz)) * 1000 > ?`,
+      [150 * 60_000],
+    )
+  ).map((r) => r.sport_key);
+
+  for (const sport of pendingSports) {
+    const last = await getMeta(`last_duel_scores_${sport}`);
+    if (last && Date.now() - Date.parse(last) < DUEL_SCORE_TTL_MS) continue;
+    await setMeta(`last_duel_scores_${sport}`, new Date().toISOString());
+    try {
+      const scores = await fetchScores(sport, 3);
+      for (const s of scores) {
+        if (!s.completed || !s.scores) continue;
+        const home = s.scores.find((x) => x.name === s.home_team);
+        const away = s.scores.find((x) => x.name === s.away_team);
+        if (!home || !away) continue;
+        await db().exec(
+          `UPDATE fixtures SET completed = 1, home_score = ?, away_score = ? WHERE id = ?`,
+          [Number(home.score), Number(away.score), s.id],
+        );
+      }
+    } catch (err) {
+      console.error(`[duel] score capture failed for ${sport}:`, err);
+    }
+  }
+}
+
+/**
+ * Keep the Showdown self-updating: fetch finals for live-duel fixtures
+ * (TTL-gated) and resolve whatever became decidable. Runs on every duel
+ * poll — both steps are no-ops when nothing is pending.
+ */
+export async function settleDuelsPassively(): Promise<void> {
+  await captureDuelScores();
+  await resolveDuels();
 }
 
 /** Goal distance between a predicted and the real scoreline — the tiebreak. */

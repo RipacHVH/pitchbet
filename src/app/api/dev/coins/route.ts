@@ -4,8 +4,12 @@ import { currentPlayer } from "@/lib/identity";
 
 const GRANT = 1000;
 
-// Temporary testing faucet — remove before any real launch.
+// Testing faucet. Only answers when DEV_FAUCET=1 (local .env.local) —
+// in production it 404s, so release builds can't mint coins.
 export async function POST() {
+  if (process.env.DEV_FAUCET !== "1") {
+    return NextResponse.json({ message: "Not found" }, { status: 404 });
+  }
   const player = await currentPlayer();
   if (!player) return NextResponse.json({ message: "Pick a player name first" }, { status: 401 });
 

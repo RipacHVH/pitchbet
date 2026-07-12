@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Archivo, Nunito, Geist_Mono } from "next/font/google";
 import { AppProviders } from "@/components/AppProviders";
+import { siteUrl } from "@/lib/site";
 import "./globals.css";
 
 const archivo = Archivo({
@@ -21,9 +22,70 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const DESCRIPTION =
+  "Free football prediction game on real upcoming matches with real bookmaker odds. " +
+  "Call winners, climb the ranked Showdown ladder in 1v1 duels, and run private leagues with your friends. No real money, ever.";
+
 export const metadata: Metadata = {
-  title: "Futcaster — call it before kickoff",
-  description: "A football forecasting game on real upcoming matches. Pick winners, stack coins.",
+  metadataBase: new URL(siteUrl()),
+  title: {
+    default: "Futcaster — call it before kickoff",
+    template: "%s · Futcaster",
+  },
+  description: DESCRIPTION,
+  applicationName: "Futcaster",
+  keywords: [
+    "football prediction game",
+    "soccer prediction game",
+    "free football game",
+    "predict football matches",
+    "football odds game",
+    "1v1 football duel",
+    "fantasy football alternative",
+    "world cup predictions",
+    "football picks with friends",
+  ],
+  category: "games",
+  openGraph: {
+    type: "website",
+    url: "/",
+    siteName: "Futcaster",
+    title: "Futcaster — call it before kickoff",
+    description: DESCRIPTION,
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Futcaster — call it before kickoff",
+    description: DESCRIPTION,
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, "max-image-preview": "large" },
+  },
+  alternates: { canonical: "/" },
+  formatDetection: { telephone: false },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#140e33",
+  width: "device-width",
+  initialScale: 1,
+};
+
+/** Structured data: tell crawlers this is a free game with online play. */
+const JSON_LD = {
+  "@context": "https://schema.org",
+  "@type": "VideoGame",
+  name: "Futcaster",
+  description: DESCRIPTION,
+  genre: ["Sports", "Prediction", "Casual"],
+  playMode: ["SinglePlayer", "MultiPlayer"],
+  applicationCategory: "Game",
+  gamePlatform: "Web browser",
+  operatingSystem: "Any",
+  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
 };
 
 export default function RootLayout({
@@ -37,6 +99,10 @@ export default function RootLayout({
       className={`${archivo.variable} ${nunito.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="relative min-h-full flex flex-col overflow-x-hidden">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
+        />
         {/* Ambient stadium: pitch centre-circle on the horizon */}
         <div
           aria-hidden

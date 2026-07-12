@@ -110,7 +110,7 @@ export function Hud({ pulse = false }: { pulse?: boolean }) {
             >
               <Coin />
               {balance === null ? "…" : Math.round(balance).toLocaleString()}
-              {joined && (
+              {joined && process.env.NEXT_PUBLIC_DEV_FAUCET === "1" && (
                 <button
                   onClick={grantCoins}
                   disabled={granting}
